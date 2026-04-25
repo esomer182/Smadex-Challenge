@@ -1,0 +1,677 @@
+"""
+Smadex Creative Copilot — ML Pipeline (scikit-learn + xgboost edition)
+=======================================================================
+Run once to regenerate ml_results.json and app_data.js, then run
+build_dashboard.py to rebuild creative_copilot.html.
+
+Install dependencies:
+    pip install pandas scikit-learn xgboost shap pillow
+
+Usage (from the dataset folder):
+    python ml_pipeline_sklearn.py
+"""
+
+import json
+import warnings
+from collections import defaultdict
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from PIL import Image
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.impute import SimpleImputer
+from sklearn.model_selection import KFold, cross_val_score
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+
+warnings.filterwarnings("ignore")
+
+try:
+    import xgboost as xgb
+    HAS_XGB = True
+    print("✓ xgboost found — KPI-specific models will use XGBRegressor")
+except ImportError:
+    HAS_XGB = False
+    print("⚠  xgboost not found — using RandomForestRegressor for all models")
+    print("   (install with: pip install xgboost)")
+
+try:
+    import shap
+    HAS_SHAP = True
+    print("✓ shap found — per-creative SHAP attributions will be computed")
+except ImportError:
+    HAS_SHAP = False
+    print("⚠  shap not found — using simplified feature attribution")
+    print("   (install with: pip install shap)")
+
+# ─────────────────────────────────────────────────────────────────────
+# PATHS  (relative to this script)
+# ─────────────────────────────────────────────────────────────────────
+BASE      = Path(__file__).parent
+DATA_DIR  = BASE
+ASSET_DIR = BASE / "assets"
+OUT_DIR   = BASE          # app_data.js + ml_results.json land here
+
+np.random.seed(42)
+
+# ═════════════════════════════════════════════════════════════════════
+# 1.  LOAD & JOIN DATA
+# ═════════════════════════════════════════════════════════════════════
+print("\n── 1. Loading CSV data ───────────────────────────────────────")
+
+creatives_df = pd.read_csv(DATA_DIR / "creative_summary.csv")
+campaigns_df = pd.read_csv(DATA_DIR / "campaigns.csv")
+daily_df     = pd.read_csv(DATA_DIR / "creative_daily_country_os_stats.csv")
+
+# ── Column aliases so the rest of the code uses clean names ──────────
+creatives_df = creatives_df.rename(columns={
+    "format":        "ad_format",
+    "emotional_tone":"tone",
+    "creative_status":"performance_status",
+})
+
+# ── Join campaign metadata (kpi_goal, target_os) ─────────────────────
+creatives_df = creatives_df.merge(
+    campaigns_df[["campaign_id", "kpi_goal", "target_os"]],
+    on="campaign_id",
+    how="left",
+)
+# Use target_os as the OS feature (campaigns have iOS / Android / Both)
+creatives_df["os"] = creatives_df["target_os"].fillna("Both")
+
+# ── Numeric coercion ─────────────────────────────────────────────────
+FLOAT_COLS = [
+    "overall_ctr", "overall_cvr", "overall_roas", "overall_ipm", "perf_score",
+    "ctr_decay_pct", "cvr_decay_pct", "text_density", "readability_score",
+    "brand_visibility_score", "clutter_score", "novelty_score", "motion_score",
+    "duration_sec", "faces_count", "has_price", "has_discount_badge",
+    "has_gameplay", "has_ugc_style", "total_spend_usd", "total_impressions",
+    "total_conversions", "total_revenue_usd", "fatigue_day",
+    "first_7d_ctr", "last_7d_ctr", "first_7d_cvr", "last_7d_cvr",
+    "total_days_active",
+]
+for col in FLOAT_COLS:
+    if col in creatives_df.columns:
+        creatives_df[col] = pd.to_numeric(creatives_df[col], errors="coerce")
+
+print(f"  {len(creatives_df)} creatives, {len(campaigns_df)} campaigns")
+print(f"  KPI distribution:")
+print("    " + creatives_df["kpi_goal"].value_counts().to_string().replace("\n", "\n    "))
+print(f"  Status distribution:")
+print("    " + creatives_df["performance_status"].value_counts().to_string().replace("\n", "\n    "))
+
+
+# ═════════════════════════════════════════════════════════════════════
+# 2.  IMAGE FEATURE EXTRACTION  (PIL — no deep learning required)
+# ═════════════════════════════════════════════════════════════════════
+print("\n── 2. Extracting image features ──────────────────────────────")
+
+def extract_image_features(path: Path) -> list:
+    """18 interpretable visual features per creative asset."""
+    try:
+        img = Image.open(path).convert("RGB").resize((64, 64))
+        arr = np.array(img, dtype=np.float32) / 255.0
+        r, g, b = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2]
+
+        feats = []
+        for ch in [r, g, b]:                                  # per-channel stats
+            mu, sd = ch.mean(), ch.std()
+            skew = float(np.mean(((ch - mu) / max(sd, 1e-6)) ** 3))
+            feats += [mu, sd, skew]
+
+        gray = 0.299 * r + 0.587 * g + 0.114 * b             # luminance
+        feats += [gray.mean(), gray.std()]
+
+        maxc = np.maximum(np.maximum(r, g), b)                # saturation
+        minc = np.minimum(np.minimum(r, g), b)
+        sat  = np.where(maxc > 0, (maxc - minc) / np.maximum(maxc, 1e-6), 0)
+        feats += [sat.mean(), sat.std()]
+
+        gx = np.abs(np.diff(gray, axis=1)).mean()             # edge density
+        gy = np.abs(np.diff(gray, axis=0)).mean()
+        feats += [gx, gy, (gx + gy) / 2]
+
+        h = gray.shape[0]                                      # vertical brightness
+        feats += [gray[:h//3].mean(), gray[h//3:2*h//3].mean(), gray[2*h//3:].mean()]
+
+        rg = r - g; yb = 0.5 * (r + g) - b                   # Hasler-Süsstrunk colorfulness
+        cf = (np.sqrt(rg.std()**2 + yb.std()**2)
+              + 0.3 * np.sqrt(rg.mean()**2 + yb.mean()**2))
+        feats.append(float(cf))
+
+        assert len(feats) == 18
+        return feats
+    except Exception:
+        return [0.0] * 18
+
+IMG_FEAT_NAMES = [
+    "img_r_mean", "img_r_std", "img_r_skew",
+    "img_g_mean", "img_g_std", "img_g_skew",
+    "img_b_mean", "img_b_std", "img_b_skew",
+    "img_brightness", "img_contrast",
+    "img_sat_mean", "img_sat_std",
+    "img_edge_x", "img_edge_y", "img_edge_avg",
+    "img_top_bright", "img_mid_bright", "img_bot_bright",
+]
+IMG_FEAT_NAMES = IMG_FEAT_NAMES[:18]
+
+image_feats: dict[str, list] = {}
+for _, row in creatives_df.iterrows():
+    cid  = row["creative_id"]
+    path = ASSET_DIR / f"{cid}.png"
+    if not path.exists():
+        path = ASSET_DIR / f"{cid}.jpg"
+    image_feats[cid] = extract_image_features(path)
+
+found = sum(1 for v in image_feats.values() if any(x != 0 for x in v))
+print(f"  {found}/{len(image_feats)} creatives with real image data")
+
+
+# ═════════════════════════════════════════════════════════════════════
+# 3.  FEATURE MATRIX
+# ═════════════════════════════════════════════════════════════════════
+print("\n── 3. Building feature matrix ────────────────────────────────")
+
+TABULAR = [
+    "overall_ctr", "overall_cvr", "overall_roas", "overall_ipm",
+    "ctr_decay_pct", "cvr_decay_pct", "duration_sec",
+    "text_density", "readability_score", "brand_visibility_score",
+    "clutter_score", "novelty_score",
+]
+
+CAT_COLS = ["ad_format", "vertical", "theme", "tone", "os"]
+le_map   = {}
+for col in CAT_COLS:
+    if col in creatives_df.columns:
+        le = LabelEncoder()
+        creatives_df[f"{col}_enc"] = le.fit_transform(
+            creatives_df[col].fillna("unknown").astype(str)
+        )
+        le_map[col] = le
+
+CAT_ENCODED = [f"{c}_enc" for c in CAT_COLS if c in creatives_df.columns]
+BINARY      = ["has_price", "has_discount_badge", "has_gameplay", "has_ugc_style"]
+for col in BINARY:
+    if col in creatives_df.columns:
+        creatives_df[col] = pd.to_numeric(creatives_df[col], errors="coerce").fillna(0)
+
+feat_cols = TABULAR + CAT_ENCODED + [c for c in BINARY if c in creatives_df.columns]
+ALL_FEAT_NAMES = feat_cols + IMG_FEAT_NAMES
+
+rows, valid_ids = [], []
+for _, row in creatives_df.iterrows():
+    cid = row["creative_id"]
+    tab = [float(row[c]) if c in creatives_df.columns and pd.notna(row.get(c)) else np.nan
+           for c in feat_cols]
+    img = image_feats.get(cid, [0.0] * 18)
+    rows.append(tab + img)
+    valid_ids.append(cid)
+
+X_raw = np.array(rows, dtype=np.float64)
+
+imputer = SimpleImputer(strategy="median")
+X_imp   = imputer.fit_transform(X_raw)
+
+scaler  = StandardScaler()
+X       = scaler.fit_transform(X_imp)
+
+print(f"  Feature matrix: {X.shape[0]} × {X.shape[1]}  "
+      f"({len(feat_cols)} tabular/cat + {len(IMG_FEAT_NAMES)} image)")
+
+
+# ═════════════════════════════════════════════════════════════════════
+# 4.  PCA  (sklearn.decomposition.PCA)
+# ═════════════════════════════════════════════════════════════════════
+print("\n── 4. PCA ────────────────────────────────────────────────────")
+
+N_PC   = min(20, X.shape[1], X.shape[0] - 1)
+pca    = PCA(n_components=N_PC, random_state=42)
+X_pca  = pca.fit_transform(X)
+
+explained  = pca.explained_variance_ratio_.tolist()
+cum_var    = float(np.sum(explained))
+print(f"  {N_PC} PCs explain {cum_var*100:.1f}% of variance")
+print(f"  Top-3 PC variance: {[round(v*100,1) for v in explained[:3]]}%")
+
+
+# ═════════════════════════════════════════════════════════════════════
+# 5.  K-MEANS CLUSTERING  (sklearn, k=8, k-means++)
+# ═════════════════════════════════════════════════════════════════════
+print("\n── 5. K-Means clustering (k=8) ───────────────────────────────")
+
+km     = KMeans(n_clusters=8, init="k-means++", n_init=10, random_state=42)
+labels = km.fit_predict(X_pca)
+
+creatives_df["cluster"] = labels
+sizes = pd.Series(labels).value_counts().sort_index()
+print(f"  Cluster sizes: {sizes.tolist()}")
+
+
+# ═════════════════════════════════════════════════════════════════════
+# 6.  FEATURE IMPORTANCE  (sklearn RF + optional xgboost)
+# ═════════════════════════════════════════════════════════════════════
+print("\n── 6. Feature importance models ──────────────────────────────")
+
+def train_importance(X_tr, y_tr, feat_names, use_xgb=False):
+    """Return top-20 [{name, importance}] sorted desc."""
+    mask = np.isfinite(y_tr)
+    if mask.sum() < 10:
+        return []
+    Xm, ym = X_tr[mask], y_tr[mask]
+
+    if use_xgb and HAS_XGB:
+        model = xgb.XGBRegressor(
+            n_estimators=200, learning_rate=0.05, max_depth=5,
+            subsample=0.8, colsample_bytree=0.8,
+            random_state=42, verbosity=0,
+        )
+    else:
+        model = RandomForestRegressor(
+            n_estimators=200, max_features="sqrt",
+            random_state=42, n_jobs=-1,
+        )
+
+    model.fit(Xm, ym)
+    pairs = sorted(zip(feat_names, model.feature_importances_),
+                   key=lambda x: x[1], reverse=True)
+    return [{"name": n, "importance": round(float(v), 5)} for n, v in pairs[:20]]
+
+
+feature_importance: dict = {}
+
+# Global models — all creatives, RF
+GLOBAL_TARGETS = {
+    "perf_score": "perf_score",
+    "ctr":        "overall_ctr",
+    "cvr":        "overall_cvr",
+    "roas":       "overall_roas",
+}
+for key, col in GLOBAL_TARGETS.items():
+    y  = creatives_df[col].values if col in creatives_df.columns else np.full(len(creatives_df), np.nan)
+    fi = train_importance(X, y, ALL_FEAT_NAMES, use_xgb=False)
+    feature_importance[key] = fi
+    top = fi[0] if fi else {}
+    print(f"  {key:12s}  top: {top.get('name','?')} ({top.get('importance',0):.3f})")
+
+# KPI-specific models — subset by kpi_goal, use xgboost if available
+KPI_TARGETS = {
+    "kpi_CPA":  ("CPA",  "overall_cvr"),
+    "kpi_ROAS": ("ROAS", "overall_roas"),
+    "kpi_IPM":  ("IPM",  "overall_ipm"),
+    "kpi_CTR":  ("CTR",  "overall_ctr"),
+}
+for key, (kpi_val, col) in KPI_TARGETS.items():
+    mask = (creatives_df["kpi_goal"] == kpi_val).values
+    Xk   = X[mask]
+    yk   = (creatives_df.loc[mask, col].values
+            if col in creatives_df.columns else np.full(mask.sum(), np.nan))
+    fi   = train_importance(Xk, yk, ALL_FEAT_NAMES, use_xgb=True)
+    feature_importance[key] = fi
+    top  = fi[0] if fi else {}
+    lib  = "XGB" if HAS_XGB else "RF"
+    print(f"  {key:12s}  n={mask.sum():3d}  [{lib}] top: {top.get('name','?')} ({top.get('importance',0):.3f})")
+
+
+# ═════════════════════════════════════════════════════════════════════
+# 7.  CLUSTER PROFILES
+# ═════════════════════════════════════════════════════════════════════
+print("\n── 7. Cluster profiles ───────────────────────────────────────")
+
+def top_val(series):
+    vc = series.dropna().astype(str).value_counts()
+    return vc.index[0] if len(vc) else "?"
+
+cluster_profiles: dict = {}
+for k in range(8):
+    sub = creatives_df[creatives_df["cluster"] == k]
+    if len(sub) == 0:
+        cluster_profiles[str(k)] = {}
+        continue
+
+    status_dist = {}
+    if "performance_status" in sub.columns:
+        status_dist = {
+            str(s): round(float(v), 3)
+            for s, v in sub["performance_status"].value_counts(normalize=True).items()
+        }
+
+    cluster_profiles[str(k)] = {
+        "size":       int(len(sub)),
+        "avg_perf":   round(float(sub["perf_score"].mean()), 4) if "perf_score"    in sub.columns else 0,
+        "avg_ctr":    round(float(sub["overall_ctr"].mean()), 6) if "overall_ctr"  in sub.columns else 0,
+        "avg_roas":   round(float(sub["overall_roas"].mean()), 4) if "overall_roas" in sub.columns else 0,
+        "top_format": top_val(sub["ad_format"]),
+        "top_theme":  top_val(sub["theme"]),
+        "top_tone":   top_val(sub["tone"]),
+        "top_kpi":    top_val(sub["kpi_goal"]),
+        "status_dist": status_dist,
+    }
+    cp = cluster_profiles[str(k)]
+    print(f"  Cluster {k}: n={cp['size']:3d}  perf={cp['avg_perf']:.3f}"
+          f"  {cp['top_format']}/{cp['top_theme']}/{cp['top_tone']}")
+
+
+# ═════════════════════════════════════════════════════════════════════
+# 8.  PER-CREATIVE ML METADATA  (cluster id + first 10 PC scores)
+# ═════════════════════════════════════════════════════════════════════
+creative_ml: dict = {
+    cid: {
+        "cluster": int(labels[i]),
+        "pc":      [round(float(v), 4) for v in X_pca[i, :10]],
+    }
+    for i, cid in enumerate(valid_ids)
+}
+
+
+# ═════════════════════════════════════════════════════════════════════
+# 8b. CROSS-VALIDATION  (5-fold, R² + MAE)
+# ═════════════════════════════════════════════════════════════════════
+print("\n── 8b. Cross-validation (5-fold) ─────────────────────────────")
+
+from sklearn.metrics import mean_absolute_error
+
+cv_results: dict = {}
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+
+CV_TARGETS = {**GLOBAL_TARGETS, **{k: v[1] for k, v in KPI_TARGETS.items()}}
+
+for key, col in CV_TARGETS.items():
+    if col not in creatives_df.columns:
+        continue
+    y_cv = creatives_df[col].values.astype(float)
+    mask  = np.isfinite(y_cv)
+    if mask.sum() < 20:
+        continue
+
+    # Use KPI subset for KPI-specific models
+    if key.startswith("kpi_"):
+        kpi_val = key.split("_", 1)[1]
+        kpi_mask = (creatives_df["kpi_goal"] == kpi_val).values & mask
+        Xcv, ycv = X[kpi_mask], y_cv[kpi_mask]
+    else:
+        Xcv, ycv = X[mask], y_cv[mask]
+
+    if len(Xcv) < 20:
+        continue
+
+    if HAS_XGB and key.startswith("kpi_"):
+        cv_model = xgb.XGBRegressor(
+            n_estimators=100, learning_rate=0.1, max_depth=4,
+            random_state=42, verbosity=0,
+        )
+    else:
+        cv_model = RandomForestRegressor(
+            n_estimators=100, max_features="sqrt", random_state=42, n_jobs=-1
+        )
+
+    r2_scores  = cross_val_score(cv_model, Xcv, ycv, cv=kf, scoring="r2")
+    mae_scores = cross_val_score(cv_model, Xcv, ycv, cv=kf,
+                                 scoring="neg_mean_absolute_error")
+
+    cv_results[key] = {
+        "r2_mean":  round(float(r2_scores.mean()), 4),
+        "r2_std":   round(float(r2_scores.std()),  4),
+        "mae_mean": round(float(-mae_scores.mean()), 6),
+        "mae_std":  round(float(mae_scores.std()),  6),
+        "n_samples": int(len(Xcv)),
+    }
+    print(f"  {key:12s}  R²={cv_results[key]['r2_mean']:+.3f} ± {cv_results[key]['r2_std']:.3f}"
+          f"  MAE={cv_results[key]['mae_mean']:.4f}  n={cv_results[key]['n_samples']}")
+
+
+# ═════════════════════════════════════════════════════════════════════
+# 8c. SHAP / FEATURE ATTRIBUTION  (per-creative top drivers)
+# ═════════════════════════════════════════════════════════════════════
+print("\n── 8c. Per-creative feature attribution ──────────────────────")
+
+# Train the main perf_score model on full data for SHAP.
+# Always use RandomForestRegressor here — shap.TreeExplainer is fully
+# compatible with sklearn RF across all versions, whereas xgboost 2.x
+# changed how base_score is serialised, causing a parse error in older
+# shap builds (ValueError: could not convert string '[5.00E-1]' to float).
+# XGBoost is still used for the KPI-specific feature importance models above.
+y_main    = creatives_df["perf_score"].values.astype(float)
+mask_main = np.isfinite(y_main)
+
+shap_model = RandomForestRegressor(
+    n_estimators=200, max_features="sqrt", random_state=42, n_jobs=-1
+)
+shap_model.fit(X[mask_main], y_main[mask_main])
+
+creative_shap: dict = {}
+
+if HAS_SHAP:
+    print("  Computing SHAP values with shap.TreeExplainer (RandomForest) …")
+    explainer   = shap.TreeExplainer(shap_model)
+    shap_values = explainer.shap_values(X)       # (n_samples, n_features)
+    base_value  = float(explainer.expected_value)
+
+    for i, cid in enumerate(valid_ids):
+        sv = shap_values[i]
+        pairs = sorted(
+            zip(ALL_FEAT_NAMES, sv), key=lambda x: abs(x[1]), reverse=True
+        )[:10]
+        creative_shap[cid] = {
+            "base": round(base_value, 4),
+            "top":  [{"name": n, "shap": round(float(v), 5)} for n, v in pairs],
+        }
+    print(f"  SHAP done for {len(creative_shap)} creatives (base={base_value:.3f})")
+
+else:
+    # Simplified attribution: importance × (standardised feature value)
+    # Positive = feature value pulls score up, negative = pulls down
+    print("  Using simplified attribution (importance × feature value) …")
+    fi_arr = shap_model.feature_importances_          # (n_features,)
+    # Global mean perf score as pseudo-base
+    base_value = float(np.nanmean(y_main))
+
+    for i, cid in enumerate(valid_ids):
+        x_std = X[i]                                  # already standardised
+        contrib = fi_arr * x_std                      # crude attribution
+        pairs = sorted(
+            zip(ALL_FEAT_NAMES, contrib), key=lambda x: abs(x[1]), reverse=True
+        )[:10]
+        creative_shap[cid] = {
+            "base": round(base_value, 4),
+            "top":  [{"name": n, "shap": round(float(v), 5)} for n, v in pairs],
+        }
+    print(f"  Simplified attribution done for {len(creative_shap)} creatives")
+
+
+# ═════════════════════════════════════════════════════════════════════
+# 8d. EMBED MODEL PARAMETERS  (for JS new-creative predictor)
+# ═════════════════════════════════════════════════════════════════════
+print("\n── 8d. Embedding model parameters for JS predictor ──────────")
+
+# Label-encoder category → index mappings
+le_mappings: dict = {}
+for col, le in le_map.items():
+    le_mappings[col] = {str(cls): int(idx) for idx, cls in enumerate(le.classes_)}
+
+# Scaler params
+scaler_params = {
+    "mean": [round(float(v), 6) for v in scaler.mean_],
+    "std":  [round(float(v), 6) for v in scaler.scale_],
+}
+
+# Imputer medians
+imputer_medians = [round(float(v), 6) for v in imputer.statistics_]
+
+
+# PCA: components (n_components x n_features), mean (n_features,)
+pca_params = {
+    "mean":       [round(float(v), 6) for v in pca.mean_],
+    "components": [[round(float(v), 6) for v in row] for row in pca.components_],
+    "explained_variance_ratio": [round(float(v), 6) for v in pca.explained_variance_ratio_],
+}
+
+# Cluster centers in KMeans PCA space
+km_centers = [[round(float(v), 4) for v in c] for c in km.cluster_centers_]
+
+# Simple linear regression: perf_score ~ PC scores (OLS)
+y_lr = creatives_df["perf_score"].values.astype(float)
+mask_lr = np.isfinite(y_lr)
+X_lr  = np.column_stack([X_pca[mask_lr], np.ones(mask_lr.sum())])
+y_lr2 = y_lr[mask_lr]
+try:
+    beta = np.linalg.lstsq(X_lr, y_lr2, rcond=None)[0]
+    lr_weights   = [round(float(v), 6) for v in beta[:-1]]
+    lr_intercept = round(float(beta[-1]), 6)
+except Exception:
+    lr_weights   = [0.0] * N_PC
+    lr_intercept = 0.35
+
+y_pred_lr = X_pca[mask_lr] @ np.array(lr_weights) + lr_intercept
+ss_res = np.sum((y_lr2 - y_pred_lr) ** 2)
+ss_tot = np.sum((y_lr2 - y_lr2.mean()) ** 2)
+lr_r2  = 1 - ss_res / ss_tot if ss_tot > 0 else 0
+print(f"  Linear model R2 on train: {lr_r2:.3f}")
+print(f"  Scaler: {len(scaler_params['mean'])} features")
+print(f"  PCA: {len(pca_params['components'])} components x {len(pca_params['components'][0])} features")
+print(f"  Label encoders: {list(le_mappings.keys())}")
+
+model_params = {
+    "feature_names":   ALL_FEAT_NAMES,
+    "le_mappings":     le_mappings,
+    "scaler":          scaler_params,
+    "imputer_medians": imputer_medians,
+    "pca":             pca_params,
+    "km_centers":      km_centers,
+    "lr_weights":      lr_weights,
+    "lr_intercept":    lr_intercept,
+    "lr_r2_train":     round(lr_r2, 4),
+}
+
+
+# =================================================================
+# 9.  CTR RETENTION BENCHMARKS  (for fatigue chart)
+# =================================================================
+print("\n-- 9. CTR retention benchmarks ---------------------------------")
+
+status_ctr_retention: dict = {}
+if "performance_status" in creatives_df.columns:
+    for status, grp in creatives_df.groupby("performance_status"):
+        valid = grp.dropna(subset=["first_7d_ctr", "last_7d_ctr"])
+        valid = valid[valid["first_7d_ctr"] > 0]
+        if len(valid):
+            ret = (valid["last_7d_ctr"] / valid["first_7d_ctr"]).clip(0, 2).median()
+            status_ctr_retention[str(status)] = round(float(ret), 3)
+print(f"  {status_ctr_retention}")
+
+
+# =================================================================
+# 10. WRITE  ml_results.json
+# =================================================================
+ml_results = {
+    "feature_importance":     feature_importance,
+    "cluster_profiles":       cluster_profiles,
+    "creative_ml":            creative_ml,
+    "creative_shap":          creative_shap,
+    "pca_explained_variance": [round(v, 4) for v in explained],
+    "feature_names":          ALL_FEAT_NAMES,
+    "status_ctr_retention":   status_ctr_retention,
+    "cv_results":             cv_results,
+    "model_params":           model_params,
+    "note": (
+        "scikit-learn: PCA, KMeans, RandomForestRegressor"
+        + (" | xgboost: XGBRegressor (KPI models)" if HAS_XGB else "")
+        + (" | shap: TreeExplainer" if HAS_SHAP else " | simplified attribution")
+    ),
+}
+
+out_ml = OUT_DIR / "ml_results.json"
+with open(out_ml, "w", encoding="utf-8") as f:
+    json.dump(ml_results, f, separators=(",", ":"))
+print(f"\n+++ Saved {out_ml}  ({out_ml.stat().st_size // 1024} KB)")
+
+
+# =================================================================
+# 11. BUILD  app_data.js
+# =================================================================
+print("\n-- 11. Building app_data.js ------------------------------------")
+
+daily_df["impressions"] = pd.to_numeric(daily_df["impressions"], errors="coerce")
+daily_df["clicks"]      = pd.to_numeric(daily_df["clicks"],      errors="coerce")
+daily_df["date"]        = pd.to_datetime(daily_df["date"],        errors="coerce")
+
+daily_agg = (
+    daily_df.groupby(["creative_id", "date"], as_index=False)
+    .agg({"clicks": "sum", "impressions": "sum"})
+)
+daily_agg["ctr"] = daily_agg["clicks"] / daily_agg["impressions"].replace(0, np.nan)
+
+ts: dict = defaultdict(list)
+for cid, grp in daily_agg.groupby("creative_id"):
+    grp = grp.sort_values("date")
+    first7_mean = grp.head(7)["ctr"].mean()
+    baseline    = float(first7_mean) if pd.notna(first7_mean) and first7_mean > 0 else None
+    for _, row in grp.iterrows():
+        if pd.isna(row["date"]) or pd.isna(row["ctr"]):
+            continue
+        entry = {
+            "d":   row["date"].strftime("%m-%d"),
+            "ctr": round(float(row["ctr"]), 6),
+        }
+        if baseline:
+            entry["ctr_norm"] = round(float(row["ctr"]) / baseline * 100, 2)
+        ts[cid].append(entry)
+
+KEEP = [
+    "creative_id", "campaign_id", "advertiser_name", "app_name",
+    "ad_format", "vertical", "theme", "tone", "os", "language",
+    "performance_status", "kpi_goal",
+    "perf_score", "overall_ctr", "overall_cvr", "overall_roas", "overall_ipm",
+    "ctr_decay_pct", "cvr_decay_pct", "fatigue_day", "total_days_active",
+    "total_impressions", "total_conversions", "total_spend_usd", "total_revenue_usd",
+    "first_7d_ctr", "last_7d_ctr",
+    "text_density", "readability_score", "brand_visibility_score",
+    "clutter_score", "novelty_score", "motion_score", "duration_sec",
+    "has_gameplay", "has_ugc_style", "has_price", "has_discount_badge",
+    "dominant_color", "hook_type", "cta_text", "headline",
+    "width", "height",
+]
+KEEP = [c for c in KEEP if c in creatives_df.columns]
+
+def safe(v):
+    if isinstance(v, float) and (np.isnan(v) or np.isinf(v)):
+        return None
+    if isinstance(v, (np.integer,)):   return int(v)
+    if isinstance(v, (np.floating,)): return round(float(v), 6)
+    try:
+        if pd.isna(v):
+            return None
+    except Exception:
+        pass
+    return v
+
+creatives_out = []
+for _, row in creatives_df.iterrows():
+    obj = {c: safe(row[c]) for c in KEEP}
+    creatives_out.append(obj)
+
+campaigns_out = {}
+for _, row in campaigns_df.iterrows():
+    campaigns_out[str(row["campaign_id"])] = {
+        "id":     str(row.get("campaign_id", "")),
+        "kpi_goal": str(row.get("kpi_goal", "CPA")),
+    }
+
+app_data = {
+    "creatives": creatives_out,
+    "ts":        dict(ts),
+    "campaigns": campaigns_out,
+}
+
+out_app = OUT_DIR / "app_data.js"
+with open(out_app, "w", encoding="utf-8") as f:
+    f.write("const APP_DATA=" + json.dumps(app_data, separators=(",", ":"), default=str) + ";")
+
+mb = out_app.stat().st_size / 1024 / 1024
+print(f"+++ Saved {out_app}  ({mb:.2f} MB)")
+
+print("\n" + "=" * 60)
+print("  ML pipeline complete!")
+print("  Next step:  python build_dashboard.py")
+print("=" * 60)
