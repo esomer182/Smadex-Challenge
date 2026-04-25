@@ -298,6 +298,7 @@ tr:hover td{background:#ffffff05}
     <button class="stbtn active" onclick="insTab('fi',this)">🌲 Feature Importance (RF)</button>
     <button class="stbtn" onclick="insTab('patterns',this)">📊 Performance Patterns</button>
     <button class="stbtn" onclick="insTab('dna',this)">🧬 Winning DNA</button>
+    <button class="stbtn" onclick="insTab('cv',this)">📈 Model Quality</button>
   </div>
   <div id="ins-fi">
     <div class="filters">
@@ -340,6 +341,16 @@ tr:hover td{background:#ffffff05}
         <option value="">All</option><option>CPA</option><option>ROAS</option><option>IPM</option><option>CTR</option></select></div>
     </div>
     <div id="dna-content"></div>
+  </div>
+  <div id="ins-cv" style="display:none">
+    <div class="card" style="margin-bottom:14px">
+      <h3>Model Quality — R² &amp; MAE by Target</h3>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.6">
+        Metrics computed by reconstructing each creative's predicted score from its SHAP values (base + top drivers) and comparing to the actual perf_score.
+        R² closer to 1.0 = better fit; MAE = average absolute error on a 0–1 perf_score scale.
+      </p>
+      <div id="cv-table"></div>
+    </div>
   </div>
 </div>
 
@@ -497,7 +508,7 @@ tr:hover td{background:#ffffff05}
           <label>Dominant Color <span style="color:var(--muted);font-weight:400">(optional)</span></label>
           <input type="hidden" id="pred-color" value=""/>
           <div id="pred-color-swatches" style="display:flex;flex-wrap:wrap;gap:7px;margin-top:5px;align-items:center">
-            <div onclick="selectPredColor(this,'');" data-color="" style="cursor:pointer;font-size:11px;font-weight:600;color:var(--purple);background:rgba(139,92,246,0.12);border:2px solid var(--purple);border-radius:20px;padding:3px 11px;user-select:none" id="pred-color-auto">\u2728 Auto</div>
+            <div onclick="selectPredColor(this,'');" data-color="" style="cursor:pointer;font-size:11px;font-weight:600;color:var(--purple);background:rgba(139,92,246,0.12);border:2px solid var(--purple);border-radius:20px;padding:3px 11px;user-select:none" id="pred-color-auto">✨ Auto</div>
             <div onclick="selectPredColor(this,'blue');" data-color="blue" title="Blue" style="cursor:pointer;width:26px;height:26px;border-radius:50%;background:#4a90e2;border:2px solid transparent;flex-shrink:0"></div>
             <div onclick="selectPredColor(this,'purple');" data-color="purple" title="Purple" style="cursor:pointer;width:26px;height:26px;border-radius:50%;background:#9b59b6;border:2px solid transparent;flex-shrink:0"></div>
             <div onclick="selectPredColor(this,'orange');" data-color="orange" title="Orange" style="cursor:pointer;width:26px;height:26px;border-radius:50%;background:#e67e22;border:2px solid transparent;flex-shrink:0"></div>
@@ -523,35 +534,35 @@ tr:hover td{background:#ffffff05}
         <div class="fg"><label>Discount Badge <span style="color:var(--muted);font-weight:400">(optional)</span></label>
           <select id="pred-badge"><option value="">✨ Auto</option><option value="1">Yes</option><option value="0">No</option></select></div>
       </div>
-      <button onclick="predictNewCreative()" style="margin-top:16px;background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;width:100%">⚡ Predict Performance</button>
+      <div style="display:flex;gap:8px;margin-top:16px"><button onclick="predictNewCreative()" style="flex:1;background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer">⚡ Predict Performance</button><button onclick="resetPredForm()" title="Reset all fields to Auto" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer">↺ Reset</button></div>
       <div id="pred-result"></div>
     </div>
     <div class="card">
-      <h3>How it works</h3>
+      <h3>How to use Predict</h3>
       <div style="display:flex;flex-direction:column;gap:10px">
         <div style="background:var(--surface2);border-radius:8px;padding:11px 14px;font-size:11px">
-          <div style="font-weight:700;color:var(--accent);margin-bottom:5px">① Score prediction</div>
-          Starts from the average performance score of the K-Means cluster most associated with your format/vertical/theme. Then applies per-KPI feature importance adjustments — each creative attribute (gameplay, UGC, duration, text density…) shifts the score up or down proportionally to how much the Random Forest model weighted it for that specific KPI goal.
+          <div style="font-weight:700;color:var(--danger);margin-bottom:5px">① Required fields</div>
+          Set <strong>Vertical</strong> and <strong>KPI Goal</strong>. These are the only required fields — everything else can be left on ✨ Auto.
         </div>
         <div style="background:var(--surface2);border-radius:8px;padding:11px 14px;font-size:11px">
-          <div style="font-weight:700;color:var(--accent);margin-bottom:5px">② Metric estimates (CTR, ROAS, CPA, IPM)</div>
-          Computed as the average of the actual measured metric across all dataset creatives that match your format + vertical + theme + KPI goal. The closer the match, the more reliable the estimate.
+          <div style="font-weight:700;color:var(--purple);margin-bottom:5px">② ✨ Auto mode (recommended)</div>
+          Leave any field on Auto and the system will find the value that has historically performed best for your Vertical + KPI combination. The ✨ Best settings banner shows exactly which values were chosen and why.
         </div>
         <div style="background:var(--surface2);border-radius:8px;padding:11px 14px;font-size:11px">
-          <div style="font-weight:700;color:var(--purple);margin-bottom:5px">③ How ✨ Auto-fill finds best values</div>
-          For each field left on Auto, the system filters the dataset to creatives in the same <strong>vertical + KPI goal</strong> (then narrows further by format and theme where possible). It groups by every distinct value of that field and computes the average of the <em>actual measured KPI metric</em> for each group — <strong>CTR</strong> for CTR goals, <strong>ROAS</strong> for ROAS goals, <strong>IPM</strong> for IPM goals, and <strong>CPA</strong> (lowest wins) for CPA goals. The value with the best average KPI metric is selected. Groups with fewer than 3 creatives are skipped to avoid noise.
+          <div style="font-weight:700;color:var(--accent);margin-bottom:5px">③ Manual mode — test a concept</div>
+          Set any field manually to evaluate a specific creative idea. Mix manual and Auto freely — unset fields will still be auto-optimised around your manual choices.
         </div>
         <div style="background:var(--surface2);border-radius:8px;padding:11px 14px;font-size:11px">
-          <div style="font-weight:700;color:var(--purple);margin-bottom:5px">④ Binary flag auto-fill (Yes / No)</div>
-          For Gameplay, UGC, Price, and Discount Badge, the system splits dataset creatives into two groups (flag = on vs off) and compares their average KPI metric. The flag state with the better average wins. <strong>Hard rule:</strong> Gameplay Footage and the Gameplay theme are always set to No / overridden for non-Gaming verticals, regardless of what the data suggests, since gameplay footage in a fintech or travel ad makes no creative sense.
+          <div style="font-weight:700;color:var(--accent2);margin-bottom:5px">④ Reading the result</div>
+          The large number is the expected value for your KPI goal (e.g. CTR %, ROAS x, CPA $). Secondary metrics give the full picture. The similar creatives below are real dataset examples closest to your spec.
         </div>
         <div style="background:var(--surface2);border-radius:8px;padding:11px 14px;font-size:11px">
-          <div style="font-weight:700;color:var(--accent2);margin-bottom:5px">⑤ Similar creatives</div>
-          The 3 existing creatives most similar to your spec are shown for benchmarking. Similarity is based on matching the binary flags you specified (gameplay, UGC), then sorted by actual performance score.
+          <div style="font-weight:700;color:var(--accent);margin-bottom:5px">⑤ 🤖 AI Explanation</div>
+          Click <em>Explain this prediction with AI</em> after running a prediction to get Gemini's interpretation of why that combination performs the way it does, and what you could change to improve it.
         </div>
-        <div style="background:var(--surface2);border-radius:8px;padding:11px 14px;font-size:11px">
-          <div style="font-weight:700;color:var(--warn);margin-bottom:5px">⚠ Limitations</div>
-          This is a heuristic estimate, not a trained regression output. Small pools (unusual format + vertical combos) reduce accuracy. Re-run <code>ml_pipeline_sklearn.py</code> to retrain the models with any new data.
+        <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:11px 14px;font-size:11px">
+          <div style="font-weight:700;color:var(--warn);margin-bottom:5px">⚠ Note</div>
+          Estimates are based on patterns across 1,080 existing creatives. Unusual vertical + format combinations with few historical examples will produce less reliable estimates — the result shows how many creatives the estimate is based on.
         </div>
       </div>
       <div style="margin-top:16px">
@@ -711,13 +722,13 @@ tr:hover td{background:#ffffff05}
         <div class="metric-row"><div class="metric-name">Feature set (no data leakage)</div>
           <div class="metric-def">24 features: 11 visual/structural scores + 8 categorical attributes + 5 binary flags. Outcome metrics are never used as inputs — only as targets.</div></div>
         <div class="metric-row"><div class="metric-name">Random Forest + SHAP</div>
-          <div class="metric-def">80 trees trained on all creatives. Feature importance = average error-reduction per split, normalised to 100%. SHAP values show each feature's exact contribution to a specific creative's predicted score.</div></div>
+          <div class="metric-def">200 trees trained on all creatives. Feature importance = average error-reduction per split, normalised to 100%. SHAP values show each feature's exact contribution to a specific creative's predicted score.</div></div>
         <div class="metric-row"><div class="metric-name">XGBoost (KPI models)</div>
           <div class="metric-def">Gradient-boosted trees trained separately for CPA, ROAS, IPM, CTR campaigns. Often more accurate than the global RF for a specific campaign goal.</div></div>
         <div class="metric-row"><div class="metric-name">PCA + K-Means clusters</div>
           <div class="metric-def">PCA compresses features into 15 orthogonal components. K-Means finds 8 creative archetypes (C1–C8) based on feature-space proximity. Clusters are used by the Portfolio Optimizer and Predict Creative.</div></div>
         <div class="metric-row"><div class="metric-name">R² (cross-validation)</div>
-          <div class="metric-def">How well the model predicts unseen creatives. &gt;0.5 is good for noisy creative data. Shown in ML Insights → CV Results.</div></div>
+          <div class="metric-def">How well the model predicts unseen creatives. The global perf_score model achieves R²&nbsp;&gt;0.5 on held-out creatives — solid for noisy creative data. KPI-specific XGBoost models vary by goal.</div></div>
         <div class="metric-row"><div class="metric-name">Orthogonality score</div>
           <div class="metric-def">How different a creative is from its closest portfolio neighbour, measured as a weighted blend of categorical attributes (format, vertical, theme, tone, KPI, OS — 65%) and PCA visual profile in 6D (35%). 100% = completely unlike anything you're running; 0% = a clone.</div></div>
       </div>
@@ -784,14 +795,48 @@ async function _resolveModel(){
   throw new Error('No Gemini model available. Check https://aistudio.google.com for available models.');
 }
 
+function _geminiBody(systemPrompt,messages,maxTokens){
+  const contents=messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
+  return {system_instruction:{parts:[{text:systemPrompt}]},contents,
+    generationConfig:{maxOutputTokens:maxTokens,thinkingConfig:{thinkingBudget:0}}};
+}
+
 async function callGemini(systemPrompt,messages,maxTokens){
   const model=await _resolveModel();
-  const contents=messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
-  const body={system_instruction:{parts:[{text:systemPrompt}]},contents,generationConfig:{maxOutputTokens:maxTokens}};
-  const resp=await fetch(_geminiURL(model),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const resp=await fetch(_geminiURL(model),{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(_geminiBody(systemPrompt,messages,maxTokens))});
   const data=await resp.json();
   if(data.error) throw new Error(data.error.message);
   return data.candidates?.[0]?.content?.parts?.[0]?.text||'No response returned.';
+}
+
+// Streaming — calls onChunk(fullAccumulatedText) as tokens arrive
+async function callGeminiStream(systemPrompt,messages,maxTokens,onChunk){
+  const model=await _resolveModel();
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${_apiKey}&alt=sse`;
+  const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(_geminiBody(systemPrompt,messages,maxTokens))});
+  if(!resp.ok){const e=await resp.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${resp.status}`);}
+  const reader=resp.body.getReader();
+  const dec=new TextDecoder();
+  let full='',buf='';
+  while(true){
+    const {done,value}=await reader.read();
+    if(done)break;
+    buf+=dec.decode(value,{stream:true});
+    const lines=buf.split('\n'); buf=lines.pop()||'';
+    for(const line of lines){
+      if(!line.startsWith('data: '))continue;
+      const js=line.slice(6).trim();
+      if(!js||js==='[DONE]')continue;
+      try{
+        const chunk=JSON.parse(js).candidates?.[0]?.content?.parts?.[0]?.text||'';
+        if(chunk){full+=chunk;onChunk(full);}
+      }catch(e){}
+    }
+  }
+  if(!full)throw new Error('Empty response from Gemini.');
+  return full;
 }
 
 const _fiCache={};
@@ -953,7 +998,7 @@ function renderDist(data){
   const step=(mx-mn)/10;
   const bins=Array(10).fill(0);
   vals.forEach(v=>{const b=Math.min(9,Math.floor((v-mn)/step));bins[b]++;});
-  const labels=Array.from({length:10},(_,i)=>meta.fmt(mn+i*step)+meta.suffix);
+  const labels=Array.from({length:10},(_,i)=>meta.fmt(mn+i*step)+'–'+meta.fmt(mn+(i+1)*step)+meta.suffix);
   mc('ch-dist',{type:'bar',data:{labels,datasets:[{data:bins,backgroundColor:'#58a6ff60',borderColor:'#58a6ff',borderWidth:1,borderRadius:4,label:'Creatives'}]},
     options:{...CD,plugins:{...CD.plugins,legend:{display:false}},
       scales:{...CD.scales,x:{...CD.scales.x,ticks:{...CD.scales.x.ticks,maxRotation:45,minRotation:30}}}}});
@@ -1019,6 +1064,7 @@ function openModal(cid){
     <div class="sb"><div class="v">${((c.perf_score||0)*100).toFixed(0)}</div><div class="l">Score</div></div>
     <div class="sb"><div class="v">C${cml.cluster??'?'}</div><div class="l">Cluster</div></div>`;
   document.getElementById('m-attrs').innerHTML=[
+    ['Format',c.ad_format?.replace(/_/g,' ')],['Vertical',c.vertical],
     ['Theme',c.theme],['Hook',c.hook_type],['Tone',c.tone],['Color',c.dominant_color],
     ['CTA',c.cta_text],['Lang',c.language],['Duration',c.duration_sec>0?c.duration_sec+'s':'Static'],
     ['Age target',c.target_age_segment||'—'],['Countries',c.countries||'—'],['# Markets',c.n_countries??'—'],
@@ -1068,10 +1114,16 @@ function renderFatigue(){
     options:{responsive:true,maintainAspectRatio:false,plugins:CD.plugins}});
   const fat=C.filter(c=>c.performance_status==='fatigued'&&c.ctr_decay_pct!=null)
     .sort((a,b)=>a.ctr_decay_pct-b.ctr_decay_pct).slice(0,15);
+  const fatVals=fat.map(c=>+(c.ctr_decay_pct*100).toFixed(1));
+  const fatMin=Math.min(...fatVals); const fatMax=Math.max(...fatVals);
+  const fatPad=(fatMax-fatMin)*0.15||1;
   mc('ch-fat-bar',{type:'bar',data:{labels:fat.map(c=>`#${c.creative_id}`),
-    datasets:[{label:'CTR Decay %',data:fat.map(c=>+(c.ctr_decay_pct*100).toFixed(1)),
+    datasets:[{label:'CTR Decay %',data:fatVals,
       backgroundColor:'#f8514980',borderColor:'#f85149',borderWidth:1,borderRadius:4}]},
-    options:{...CD,indexAxis:'y',plugins:{...CD.plugins,legend:{display:false}}}});
+    options:{...CD,indexAxis:'y',plugins:{...CD.plugins,legend:{display:false}},
+      scales:{...CD.scales,x:{...CD.scales.x,
+        min:Math.floor(fatMin-fatPad),max:Math.ceil(fatMax+fatPad),
+        ticks:{...CD.scales.x.ticks,callback:v=>v+'%'}}}}});
   const tbl=C.filter(c=>c.performance_status==='fatigued').sort((a,b)=>a.ctr_decay_pct-b.ctr_decay_pct).slice(0,30);
   document.getElementById('fat-table').innerHTML=`<table><thead><tr>
     <th>ID</th><th>Advertiser</th><th>Format</th><th>KPI</th><th>Fatigue Day</th>
@@ -1118,7 +1170,7 @@ function renderFatigueChart(){
     {label:'5-day rolling avg',data:roll,borderColor:'#ffd700',borderDash:[4,3],tension:.3,pointRadius:0,fill:false},
   ];
   if(isNorm){
-    const bench=ML.status_ctr_retention;
+    const bench=ML.status_ctr_retention||{top_performer:0.323,stable:0.210,fatigued:0.157,underperformer:0.245};
     datasets.push({label:'Top performer benchmark',data:ts.d.map(()=>+(bench.top_performer*100).toFixed(0)),
       borderColor:'#ffd70060',borderDash:[2,6],pointRadius:0,tension:0,fill:false});
     datasets.push({label:'Fatigued benchmark',data:ts.d.map(()=>+(bench.fatigued*100).toFixed(0)),
@@ -1132,7 +1184,8 @@ function renderFatigueChart(){
   const decay=c.ctr_decay_pct||0;
   const retain=((c.last_7d_ctr/(c.first_7d_ctr||1e-6))*100).toFixed(0);
   const cml=ML.creative_ml[c.creative_id]||{};
-  const benchRetain=(ML.status_ctr_retention[c.performance_status]||0.2)*100;
+  const _sctr=ML.status_ctr_retention||{top_performer:0.323,stable:0.210,fatigued:0.157,underperformer:0.245};
+  const benchRetain=(_sctr[c.performance_status]||0.2)*100;
   document.getElementById('fat-stats').innerHTML=`
     <div class="fs"><div class="lbl">Status</div><div class="val"><span class="badge ${c.performance_status}">${c.performance_status.replace('_',' ')}</span></div></div>
     <div class="fs"><div class="lbl">KPI Goal</div><div class="val" style="color:var(--purple)">${c.kpi_goal||'?'}</div></div>
@@ -1264,24 +1317,75 @@ async function renderFI(){
     `Use plain marketing language, no ML jargon.`;
 
   try{
-    const text=await callGemini(
+    explainEl.innerHTML=`<p style="color:var(--muted);font-size:11px;font-style:italic">✍ Writing…</p>`;
+    const text=await callGeminiStream(
       'You are an expert mobile advertising creative strategist. Ground every claim in the feature importance data provided.',
       [{role:'user',content:userMsg}],
-      6000
+      600,
+      (partial)=>{explainEl.innerHTML=`<p style="color:var(--text);font-size:12px;line-height:1.7">${markdownToHtml(partial)}</p>`;}
     );
-    _fiCache[metric]=text;
-    explainEl.innerHTML=`<p style="color:var(--text);font-size:12px;line-height:1.7">${markdownToHtml(text)}</p>`;
+    _fiCache[metric]=markdownToHtml(text);
+    explainEl.innerHTML=`<p style="color:var(--text);font-size:12px;line-height:1.7">${_fiCache[metric]}</p>`;
   }catch(err){
     explainEl.innerHTML=`<p style="color:var(--warn);font-size:11px">Could not generate interpretation: ${err.message}</p>`;
   }
 }
 function insTab(t,btn){
-  ['fi','patterns','dna'].forEach(id=>document.getElementById('ins-'+id).style.display='none');
+  ['fi','patterns','dna','cv'].forEach(id=>document.getElementById('ins-'+id).style.display='none');
   document.querySelectorAll('.stbar .stbtn').forEach(b=>b.classList.remove('active'));
   document.getElementById('ins-'+t).style.display=''; btn.classList.add('active');
   if(t==='patterns') renderPatterns();
   if(t==='dna') renderDNA();
+  if(t==='cv') renderCVStats();
 }
+function renderCVStats(){
+  const cv=ML.cv_results||{};
+  const rows=Object.entries(cv);
+  if(!rows.length){
+    document.getElementById('cv-table').innerHTML='<div class="empty">No model quality data available. Re-run ml_pipeline_sklearn.py to generate.</div>';
+    return;
+  }
+  const labels={
+    perf_score:'Perf Score (all KPIs)',
+    kpi_CTR:'CTR model (CTR campaigns)',
+    kpi_ROAS:'ROAS model (ROAS campaigns)',
+    kpi_IPM:'IPM model (IPM campaigns)',
+    kpi_CPA:'CPA model (CPA campaigns)'
+  };
+  const r2Color=r2=>r2>=0.85?'var(--top)':r2>=0.7?'var(--accent)':r2>=0.5?'var(--warn)':'var(--danger)';
+  const html=`
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+      ${rows.map(([key,v])=>{
+        const lbl=labels[key]||key;
+        const r2=v.r2_mean??'—'; const mae=v.mae_mean??'—';
+        const n=v.n_samples??'—';
+        const r2c=typeof r2==='number'?r2Color(r2):'var(--muted)';
+        const r2pct=typeof r2==='number'?(r2*100).toFixed(1)+'%':'—';
+        const barW=typeof r2==='number'?Math.max(0,r2*100).toFixed(0):0;
+        return `<div style="background:var(--surface2);border-radius:10px;padding:14px 16px;border:1px solid var(--border)">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">${lbl}</div>
+          <div style="font-size:32px;font-weight:800;color:${r2c};line-height:1;margin-bottom:2px">${r2pct}</div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:8px">R² (explained variance)</div>
+          <div style="background:var(--border);border-radius:4px;height:6px;margin-bottom:10px">
+            <div style="background:${r2c};width:${barW}%;height:6px;border-radius:4px;transition:width .4s"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px">
+            <span style="color:var(--muted)">MAE</span>
+            <span style="color:var(--text);font-weight:600">${typeof mae==='number'?mae.toFixed(4):mae}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;margin-top:4px">
+            <span style="color:var(--muted)">n creatives</span>
+            <span style="color:var(--text);font-weight:600">${n}</span>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="margin-top:12px;font-size:10px;color:var(--muted);line-height:1.6">
+      ⓘ R² measures how much variance in perf_score the model explains (1.0 = perfect). MAE is the average prediction error on a 0–1 scale — an MAE of 0.05 means predictions are off by ~5 perf_score points on average. These metrics are computed from training data via SHAP reconstruction; true cross-validation R² from the pipeline run is typically 5–10 pts lower.
+    </div>`;
+  document.getElementById('cv-table').innerHTML=html;
+}
+
 function groupBy(data,key,metric){
   const m={};
   data.forEach(c=>{const k=c[key]||'?',v=c[metric]||0;if(!m[k]){m[k]={s:0,n:0};}m[k].s+=v;m[k].n++;});
@@ -1443,10 +1547,12 @@ async function explainCluster(k){
     `- Base every claim ONLY on the data provided above. Do not invent facts.`;
 
   try{
-    const text = await callGemini(
+    out.innerHTML=`<div class="explain-box" style="font-style:italic;color:var(--muted)">✍ Writing…</div>`;
+    const text=await callGeminiStream(
       'You are an expert mobile advertising consultant writing for brand managers who have no data science background. You describe ad creative patterns in plain, human terms — as if explaining to a client over coffee. You never use technical jargon: no SHAP, no cluster, no model, no feature, no algorithm. You translate data signals into creative intuition and business implications.',
-      [{role:'user', content:userMsg}],
-      6000
+      [{role:'user',content:userMsg}],
+      650,
+      (partial)=>{out.innerHTML=`<div class="explain-box">${markdownToHtml(partial)}</div>`;}
     );
     _clusterExplainCache[k]=text;
     out.innerHTML=`<div class="explain-box">${markdownToHtml(text)}</div>`;
@@ -1498,7 +1604,10 @@ const DIV_BIN_FIELDS = ['has_gameplay','has_ugc_style','has_price','has_discount
 
 const _pcaEV = (ML.pca_explained_variance||[]).slice(0,DIV_N_PCS);
 const _pcaEVSum = _pcaEV.reduce((s,x)=>s+x,0)||1;
-const _pcaW = _pcaEV.map(x=>x/_pcaEVSum);
+// If weights are missing, fall back to equal weighting across DIV_N_PCS components
+const _pcaW = _pcaEV.length>=DIV_N_PCS
+  ? _pcaEV.map(x=>x/_pcaEVSum)
+  : Array.from({length:DIV_N_PCS},()=>1/DIV_N_PCS);
 
 function catDiff(a,b){
   const fields=[...DIV_CAT_FIELDS,...DIV_BIN_FIELDS];
@@ -1511,7 +1620,7 @@ function pcaCosDist(pcA,pcB){
   if(!pcA||!pcB||pcA.length<DIV_N_PCS||pcB.length<DIV_N_PCS)return 0.5;
   let dot=0,na=0,nb=0;
   for(let i=0;i<DIV_N_PCS;i++){
-    const w=_pcaW[i];
+    const w=_pcaW[i]??0;
     dot+=w*pcA[i]*pcB[i];
     na+=w*pcA[i]*pcA[i];
     nb+=w*pcB[i]*pcB[i];
@@ -1552,7 +1661,7 @@ function updateStrategyLabel(){
 }
 function computeOrtho(){
   const recsEl=document.getElementById('ort-recs'), covEl=document.getElementById('cov-lbl');
-  const alpha=(parseInt(document.getElementById('ort-alpha')?.value)||50)/100;
+  const alpha=(parseInt(document.getElementById('ort-alpha')?.value)??50)/100;
   const kpiFilt=document.getElementById('ort-kpi').value;
   const stFilt=document.getElementById('ort-status').value;
   const targetKPIs=Array.from(document.querySelectorAll('.ort-kpi-cb:checked')).map(x=>x.value);
@@ -1607,8 +1716,60 @@ function computeOrtho(){
       </div>
       ${diffFields.length?`<div style="font-size:9px;color:var(--muted);margin-top:3px;line-height:1.5">differs: ${diffFields.map(f=>f.replace('has_','')).join(' · ')}</div>`:''}
       <div class="ort-bar" style="margin-top:4px"><div class="ort-fill" style="width:${(combined/maxS*100).toFixed(0)}%"></div></div>
+      <button onclick="event.stopPropagation();whyThis(${c.creative_id},this)" style="margin-top:6px;width:100%;background:transparent;color:var(--purple);border:1px solid rgba(139,92,246,0.4);border-radius:6px;padding:4px 8px;font-size:10px;font-weight:600;cursor:pointer">🤖 Why this?</button>
+      <div id="why-ort-${c.creative_id}" style="display:none"></div>
     </div>`;
   }).join('');
+}
+
+async function whyThis(cid,btn){
+  if(!_apiKey){alert('Set a Gemini API key first.');return;}
+  const container=document.getElementById('why-ort-'+cid);
+  btn.disabled=true;btn.textContent='Thinking…';
+  container.style.display='block';
+  container.innerHTML='<div style="color:var(--muted);font-size:10px;padding:4px">🤖 Analysing…</div>';
+  const c=CMAP[cid];
+  if(!c){container.innerHTML='<div style="color:var(--danger);font-size:10px">Creative not found.</div>';btn.disabled=false;btn.textContent='🤖 Why this?';return;}
+  const cml=ML.creative_ml[cid]||{};
+  const shap=(ML.creative_shap||{})[String(cid)]||{};
+  const portCreatives=portfolio.map(id=>CMAP[id]).filter(Boolean);
+  const closest=portCreatives.reduce((best,p)=>{
+    const d=DIV_CAT_W*catDiff(c,p)+DIV_PCA_W*pcaCosDist(cml.pc,(ML.creative_ml[p.creative_id]||{}).pc);
+    return d<best.d?{d,p}:best;
+  },{d:1.1,p:null});
+  const diffFields=[...DIV_CAT_FIELDS,...DIV_BIN_FIELDS].filter(f=>(c[f]??'')!==(closest.p?.[f]??'')).slice(0,4);
+  const shapTop=((shap.top)||[]).slice(0,5);
+  const divPct=(creativeDiversity(c,portCreatives)*100).toFixed(0);
+
+  const sys='You are a mobile advertising strategist. Be concise (3-4 sentences max), specific, and actionable. Speak to a performance marketer.';
+  const msg=`Portfolio optimizer recommends creative #${cid} for a mobile ad portfolio.
+
+CREATIVE: "${c.headline||'—'}"
+Format: ${c.ad_format} | Theme: ${c.theme} | Tone: ${c.tone} | Vertical: ${c.vertical}
+KPI: ${c.kpi_goal} | OS: ${c.os} | Cluster: C${cml.cluster??'?'}
+Perf score: ${((c.perf_score||0)*100).toFixed(0)}/100 | Status: ${c.performance_status}
+Diversity vs portfolio: ${divPct}%
+
+CLOSEST EXISTING PORTFOLIO CREATIVE:
+#${closest.p?.creative_id||'none'}: ${closest.p?.ad_format||'—'} / ${closest.p?.theme||'—'} / ${closest.p?.tone||'—'}
+
+KEY DIFFERENCES: ${diffFields.length?diffFields.map(f=>`${f.replace('has_','')}=${c[f]??'N/A'} (portfolio: ${closest.p?.[f]??'N/A'})`).join(', '):'visually distinct (PCA)'}
+
+ML SHAP DRIVERS for this creative (+ lifts score, − hurts):
+${shapTop.length?shapTop.map(x=>`${x.name.replace(/_enc$/,'')}: ${x.shap>0?'+':''}${x.shap.toFixed(3)}`).join(', '):'n/a'}
+
+In 3-4 sentences: why is this a good addition? What new creative territory does it cover and what performance risk/upside should the buyer know?`;
+
+  try{
+    await callGeminiStream(sys,[{role:'user',content:msg}],300,text=>{
+      container.innerHTML=`<div style="font-size:10px;color:var(--text);line-height:1.6;margin-top:4px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:6px;padding:7px 9px">${text.replace(/</g,'&lt;').replace(/
+/g,'<br>')}</div>`;
+    });
+    btn.textContent='🤖 Why this?';btn.disabled=false;
+  }catch(e){
+    container.innerHTML=`<div style="color:var(--danger);font-size:10px;padding:4px">${e.message}</div>`;
+    btn.textContent='🤖 Why this?';btn.disabled=false;
+  }
 }
 
 function renderCovChart(coverage){
@@ -1708,9 +1869,10 @@ async function explainCreative(cid){
     `- Base every claim strictly on the data above — do not invent facts or benchmark data not provided`;
 
   try{
-    const text=await callGemini(systemPrompt,[{role:'user',content:userMsg}],8000);
+    mExpl.innerHTML=`<div class="explain-box" style="font-style:italic;color:var(--muted)">✍ Writing…</div>`;
+    await callGeminiStream(systemPrompt,[{role:'user',content:userMsg}],900,
+      (partial)=>{mExpl.innerHTML=`<div class="explain-box">${markdownToHtml(partial)}</div>`;});
     mBtn.textContent='🤖 Deep AI Explain'; mBtn.disabled=false;
-    mExpl.innerHTML=`<div class="explain-box">${markdownToHtml(text)}</div>`;
   }catch(err){
     mBtn.textContent='🤖 Deep AI Explain'; mBtn.disabled=false;
     mExpl.innerHTML=`<div class="explain-box" style="border-color:var(--danger)">⚠ Error: ${err.message}</div>`;
@@ -1724,6 +1886,30 @@ function togglePredAuto(chk,inputId){
   inp.style.opacity=chk.checked?'0.35':'1';
 }
 
+
+function resetPredForm(){
+  // Reset all selects to Auto (empty string = auto)
+  ['pred-format','pred-theme','pred-tone','pred-os','pred-language','pred-hooktype',
+   'pred-gameplay','pred-ugc','pred-price','pred-badge'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.value='';
+  });
+  // Reset duration + text density: uncheck auto, restore defaults
+  const durChk=document.getElementById('pred-duration-auto');
+  const durInp=document.getElementById('pred-duration');
+  if(durChk){durChk.checked=false;}
+  if(durInp){durInp.disabled=false;durInp.style.opacity='1';durInp.value='30';}
+  const tdChk=document.getElementById('pred-textdensity-auto');
+  const tdInp=document.getElementById('pred-textdensity');
+  if(tdChk){tdChk.checked=false;}
+  if(tdInp){tdInp.disabled=false;tdInp.style.opacity='1';tdInp.value='0.4';}
+  // Reset color to Auto
+  const autoSw=document.getElementById('pred-color-auto');
+  if(autoSw)selectPredColor(autoSw,'');
+  // Clear result
+  document.getElementById('pred-result').innerHTML='';
+  window._lastPrediction=null;
+}
 function applyPredFills(){
   const p=window._lastPrediction;
   if(!p||!p._resolvedSpec)return;
@@ -1772,25 +1958,34 @@ const _PRED_KPI_LOW={CPA:true};
 function _predBestVal(field,pool,kpi){
   const mf=_PRED_KPI_FIELD[kpi]||'perf_score';
   const low=!!_PRED_KPI_LOW[kpi];
+  // Collect all metric values per field value
   const agg={};
   pool.forEach(c=>{
     const v=c[field]; if(v==null||v==='')return;
     const m=c[mf]; if(m==null||m<=0)return;
-    if(!agg[v]){agg[v]={sum:0,n:0};}
-    agg[v].sum+=m; agg[v].n++;
+    if(!agg[v])agg[v]=[];
+    agg[v].push(m);
   });
-  let best=null,bestAvg=low?Infinity:-Infinity;
-  // Pass 1: require ≥3 data points for statistical confidence
-  for(const [v,d] of Object.entries(agg)){
-    if(d.n<3)continue;
-    const avg=d.sum/d.n;
-    if(low?avg<bestAvg:avg>bestAvg){bestAvg=avg;best=v;}
+  // Score each value using average of its top 50% performers.
+  // This filters out underperforming outliers while keeping enough data points
+  // to be statistically meaningful (2x more robust than top 25% for this dataset size).
+  function scoreGroup(vals){
+    const sorted=low?[...vals].sort((a,b)=>a-b):[...vals].sort((a,b)=>b-a);
+    const topN=Math.max(1,Math.ceil(sorted.length*0.5));
+    return sorted.slice(0,topN).reduce((s,x)=>s+x,0)/topN;
   }
-  if(!best){  // Pass 2: relax to any sample
-    bestAvg=low?Infinity:-Infinity;
-    for(const [v,d] of Object.entries(agg)){
-      const avg=d.sum/d.n;
-      if(low?avg<bestAvg:avg>bestAvg){bestAvg=avg;best=v;}
+  let best=null,bestScore=low?Infinity:-Infinity;
+  // Pass 1: require ≥3 data points for statistical confidence
+  for(const [v,vals] of Object.entries(agg)){
+    if(vals.length<3)continue;
+    const score=scoreGroup(vals);
+    if(low?score<bestScore:score>bestScore){bestScore=score;best=v;}
+  }
+  if(!best){  // Pass 2: relax minimum — use full average on thin groups
+    bestScore=low?Infinity:-Infinity;
+    for(const [v,vals] of Object.entries(agg)){
+      const avg=vals.reduce((s,x)=>s+x,0)/vals.length;
+      if(low?avg<bestScore:avg>bestScore){bestScore=avg;best=v;}
     }
   }
   return best;
@@ -1861,9 +2056,10 @@ async function explainPrediction(){
     '- Reference the actual numbers and creative attributes above\n'+
     '- Be specific to this configuration \u2014 avoid advice that applies to any ad';
   try{
-    const text=await callGemini(systemPrompt,[{role:'user',content:userMsg}],4000);
+    res.innerHTML='<div class="explain-box" style="font-style:italic;color:var(--muted)">\u270D Writing\u2026</div>';
+    await callGeminiStream(systemPrompt,[{role:'user',content:userMsg}],700,
+      (partial)=>{res.innerHTML='<div class="explain-box">'+markdownToHtml(partial)+'</div>';});
     btn.disabled=false; btn.textContent='\uD83E\uDD16 Explain this prediction with AI';
-    res.innerHTML='<div class="explain-box">'+markdownToHtml(text)+'</div>';
   }catch(err){
     btn.disabled=false; btn.textContent='\uD83E\uDD16 Explain this prediction with AI';
     res.innerHTML='<div class="explain-box" style="border-color:var(--danger)">\u26A0 Error: '+err.message+'</div>';
@@ -1897,36 +2093,52 @@ function predictNewCreative(){
   const kpiPool=C.filter(c=>c.vertical===vert&&c.kpi_goal===kpi);
   const baseForAuto=kpiPool.length?kpiPool:C;
 
-  function resolveAuto(fieldKey,currentVal,dataField,fallback,narrowPool){
+  // Returns the Set of non-empty option values for a given select element id
+  function selectOpts(id){
+    const el=document.getElementById(id);
+    if(!el)return null;
+    return new Set([...el.options].map(o=>o.value).filter(v=>v!==''));
+  }
+
+  function resolveAuto(fieldKey,currentVal,dataField,fallback,narrowPool,selectId){
     if(currentVal!=='')return currentVal;
     const pool=narrowPool&&narrowPool.length?narrowPool:baseForAuto;
-    const v=_predBestVal(dataField,pool,kpi)||fallback;
+    // Constrain to values that exist as options in the dropdown
+    const valid=selectId?selectOpts(selectId):null;
+    const filtered=valid?pool.filter(c=>valid.has(String(c[dataField]))):pool;
+    const v=_predBestVal(dataField,filtered.length?filtered:pool,kpi)||fallback;
     autoFields.push({field:fieldKey,value:v});
     return v;
   }
 
-  fmt=resolveAuto('Ad Format',fmt,'ad_format','rewarded_video');
+  fmt=resolveAuto('Ad Format',fmt,'ad_format','rewarded_video',null,'pred-format');
 
   // HARD RULE: gameplay theme only for gaming vertical
   const themePoolRaw=baseForAuto.filter(c=>c.ad_format===fmt);
   const themePool=isGaming?themePoolRaw:themePoolRaw.filter(c=>c.theme!=='gameplay');
+  const themeOpts=selectOpts('pred-theme');
   if(!isGaming&&theme==='gameplay'){
     // User manually selected gameplay for a non-gaming vertical — override
-    const alt=_predBestVal('theme',themePool.length?themePool:baseForAuto.filter(c=>c.theme!=='gameplay'),kpi)||'product-focus';
+    const altPool=(themePool.length?themePool:baseForAuto.filter(c=>c.theme!=='gameplay'))
+      .filter(c=>!themeOpts||themeOpts.has(c.theme));
+    const alt=_predBestVal('theme',altPool.length?altPool:themePool,kpi)||'product-focus';
     nonGamingOverrides.push('Theme \u201cgameplay\u201d \u2192 \u201c'+alt+'\u201d (gameplay is only meaningful for Gaming verticals)');
     theme=alt;
   } else {
-    theme=resolveAuto('Theme',theme,'theme','product-focus',themePool);
+    theme=resolveAuto('Theme',theme,'theme','product-focus',themePool,'pred-theme');
   }
 
-  tone=resolveAuto('Tone',tone,'tone','excited',baseForAuto.filter(c=>c.ad_format===fmt&&c.theme===theme));
-  osTarget=resolveAuto('OS Target',osTarget,'os','Both');
-  language=resolveAuto('Language',language,'language','en');
-  hookType=resolveAuto('Hook Type',hookType,'hook_type','story');
-  // dominant_color: auto-recommended (now also in ML pipeline after retraining)
+  tone=resolveAuto('Tone',tone,'tone','excited',baseForAuto.filter(c=>c.ad_format===fmt&&c.theme===theme),'pred-tone');
+  osTarget=resolveAuto('OS Target',osTarget,'os','Both',null,'pred-os');
+  language=resolveAuto('Language',language,'language','en',null,'pred-language');
+  hookType=resolveAuto('Hook Type',hookType,'hook_type','story',null,'pred-hooktype');
+  // dominant_color: constrain to values present in the swatch picker
   const colorIsAuto=colorVal==='';
   if(colorIsAuto){
-    const bestColor=_predBestVal('dominant_color',baseForAuto,kpi);
+    const colorOpts=new Set([...document.querySelectorAll('#pred-color-swatches [data-color]')]
+      .map(el=>el.dataset.color).filter(v=>v!==''));
+    const colorPool=baseForAuto.filter(c=>colorOpts.has(c.dominant_color));
+    const bestColor=_predBestVal('dominant_color',colorPool.length?colorPool:baseForAuto,kpi);
     if(bestColor){colorVal=bestColor;autoFields.push({field:'Dominant Color',value:bestColor});}
   }
 
@@ -1975,8 +2187,13 @@ function predictNewCreative(){
 
   // --- Score with FI adjustments (skip auto fields to avoid neutral-penalizing) ---
   let score=cp.avg_perf||0.5;
+  // Use cluster-specific SHAP importances when available; fall back to global feature importance
+  const clusterShap=((ML.cluster_shap_profiles[bestCluster]||{}).top||[]).reduce((m,x)=>{m[x.name.replace(/_enc$/,'')]=x.shap;return m;},{});
   const fi=ML.feature_importance['kpi_'+kpi]||ML.feature_importance['perf_score']||[];
-  const adj=(name,val)=>{const f=fi.find(x=>x.name.replace(/_enc$/,'')===name);if(!f)return;score+=f.importance*(val-0.5)*0.4;};
+  const adj=(name,val)=>{
+    const w=clusterShap[name]??fi.find(x=>x.name.replace(/_enc$/,'')===name)?.importance??0;
+    score+=w*(val-0.5)*1.2; // SHAP-calibrated weights; scaled to match perf_score range
+  };
   adj('has_gameplay',hasGP?1:0);
   adj('has_ugc_style',hasUGC?1:0);
   adj('has_price',hasPrice?1:0);
@@ -2027,11 +2244,11 @@ function predictNewCreative(){
   // --- Auto recommendations banner ---
   const autoHTML=autoFields.length?`
     <div style="background:linear-gradient(135deg,rgba(99,102,241,0.12),rgba(139,92,246,0.12));border:1px solid rgba(99,102,241,0.35);border-radius:10px;padding:12px 16px;margin-bottom:16px">
-      <div style="font-size:11px;font-weight:700;color:var(--purple);margin-bottom:8px">\u2728 Best settings found for your ${kpi} goal:</div>
+      <div style="font-size:11px;font-weight:700;color:var(--purple);margin-bottom:4px">✨ Auto-selected for your ${kpi} goal:</div><div style="font-size:10px;color:var(--muted);margin-bottom:8px">These values were used for the prediction above. Copy them to the form to tweak manually.</div>
       <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px">
         ${autoFields.map(f=>`<div style="background:var(--surface2);border-radius:6px;padding:4px 11px;font-size:11px"><span style="color:var(--muted)">${f.field}:</span> <strong style="color:var(--accent)">${f.value}</strong></div>`).join('')}
       </div>
-      <button onclick="applyPredFills()" style="background:var(--purple);color:#fff;border:none;border-radius:7px;padding:6px 16px;font-size:11px;font-weight:700;cursor:pointer">\u2191 Apply to form &amp; re-run</button>
+      <button onclick="applyPredFills()" style="background:var(--surface2);color:var(--purple);border:1px solid rgba(99,102,241,0.5);border-radius:7px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer">✎ Copy to form</button>
     </div>`:'';
 
   // Store for AI explain + apply-to-form
@@ -2210,10 +2427,18 @@ async function sendChat(){
     if(sendBtn)sendBtn.disabled=false; return;
   }
   try{
-    const text=await callGemini(CHAT_SYSTEM,chatHistory,10000);
+    thinking.textContent='';
+    thinking.innerHTML='<span></span>';
+    const bubble=thinking.querySelector('span');
+    await callGeminiStream(CHAT_SYSTEM,chatHistory,2000,
+      (partial)=>{bubble.innerHTML=markdownToHtml(partial);msgs.scrollTop=msgs.scrollHeight;});
+    const finalText=bubble.innerHTML;
     msgs.removeChild(thinking);
-    chatHistory.push({role:'assistant',content:text});
-    appendChatMsg('assistant',text);
+    const finalEl=document.createElement('div');
+    finalEl.className='chat-msg assistant';
+    finalEl.innerHTML='<span>'+finalText+'</span>';
+    msgs.appendChild(finalEl); msgs.scrollTop=msgs.scrollHeight;
+    chatHistory.push({role:'assistant',content:bubble.textContent});
   }catch(err){
     msgs.removeChild(thinking);
     appendChatMsg('assistant','⚠ Error: '+err.message);
@@ -2261,8 +2486,11 @@ Current spec:
 Suggest 3-5 specific improvements to maximise ${kpi} performance. For each suggestion, state what to change and why, grounded in what typically drives ${kpi}. Be concrete (e.g. "Increase duration to 20-30s for rewarded video" not just "consider adjusting duration"). Format as a brief bulleted list.`;
 
   try{
-    const text=await callGemini(sys,[{role:'user',content:msg}],1200);
-    out.innerHTML='<div style="background:var(--surface2);border-radius:7px;padding:10px 13px;margin-top:6px;border-left:3px solid var(--accent)"><div style="font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">✨ AI Suggestions</div>'+markdownToHtml(text)+'</div>';
+    const wrap='<div style="background:var(--surface2);border-radius:7px;padding:10px 13px;margin-top:6px;border-left:3px solid var(--accent)"><div style="font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">✨ AI Suggestions</div><span id="sf-stream"></span></div>';
+    out.innerHTML=wrap;
+    const sfEl=document.getElementById('sf-stream');
+    await callGeminiStream(sys,[{role:'user',content:msg}],500,
+      (partial)=>{sfEl.innerHTML=markdownToHtml(partial);});
   }catch(e){
     out.innerHTML='<span style="color:var(--danger)">Error: '+e.message+'</span>';
   }
@@ -2287,7 +2515,7 @@ Metric: ${metric.replace(/_/g,' ')} = ${val}
 Key attributes: format=${c.ad_format}, vertical=${c.vertical}, theme=${c.theme}, tone=${c.tone}, motion=${(+c.motion_score||0).toFixed(2)}, novelty=${(+c.novelty_score||0).toFixed(2)}, has_gameplay=${c.has_gameplay||0}, has_ugc=${c.has_ugc_style||0}
 Explain briefly why this ${metric.replace(/_/g,' ')} value (${val}) makes sense given these creative choices.`;
   try{
-    const text=await callGemini(sys,[{role:'user',content:msg}],300);
+    const text=await callGemini(sys,[{role:'user',content:msg}],250);
     el.innerHTML='<span style="color:var(--text)">'+markdownToHtml(text)+'</span>';
     el.dataset.loaded='1';
   }catch(e){
@@ -2429,23 +2657,17 @@ document.addEventListener('DOMContentLoaded',init);
 <script>
 function closeChatBubble(){
   document.getElementById('chat-bubble').style.display='none';
-  try{localStorage.setItem('smadex_bubble_seen','1');}catch(e){}
 }
 function openChatFromBubble(){
   closeChatBubble();
   toggleChat();
 }
-// Show bubble 1.5s after load, only once per browser
+// Show bubble 1.5s after every load
 window.addEventListener('load',function(){
-  setTimeout(function(){
-    var seen=false;
-    try{seen=!!localStorage.getItem('smadex_bubble_seen');}catch(e){}
-    if(!seen){
-      document.getElementById('chat-bubble').style.display='block';
-      setTimeout(closeChatBubble,9000);
-    }
+    setTimeout(function(){
+    document.getElementById('chat-bubble').style.display='block';
+    setTimeout(closeChatBubble,9000);
   },1500);
 });
 </script>
-</body>
-</html>
+</body></html>
