@@ -968,12 +968,40 @@ function renderScatter(data){
 }
 
 // ── MODAL ─────────────────────────────────────────────────────────────────────
+let _modalCid=null, _modalImgMode='photo'; // 'photo' | 'analytics'
+
+function _renderModalImg(cid){
+  const c=CMAP[cid]; if(!c)return;
+  const el=document.getElementById('m-img');
+  if(_modalImgMode==='photo'){
+    el.innerHTML=`<div style="position:relative;width:100%;height:200px">
+      <img id="m-real-img" src="assets/creative_${cid}.png"
+        style="width:100%;height:200px;object-fit:contain;border-radius:9px;background:var(--surface2);display:block"
+        onerror="document.getElementById('m-real-img').style.display='none';document.getElementById('m-img-svg').style.display='block'"/>
+      <div id="m-img-svg" style="display:none;width:100%;height:200px">${generateCreativePreview(c)}</div>
+      <button onclick="_toggleModalImg()" title="Switch to analytics view"
+        style="position:absolute;top:7px;right:7px;background:rgba(0,0,0,.65);color:#fff;border:none;border-radius:6px;padding:4px 9px;font-size:10px;font-weight:600;cursor:pointer;backdrop-filter:blur(4px)">📊 Analytics</button>
+    </div>`;
+  }else{
+    el.innerHTML=`<div style="position:relative;width:100%;height:200px">
+      ${generateCreativePreview(c)}
+      <button onclick="_toggleModalImg()" title="Show creative image"
+        style="position:absolute;top:7px;right:7px;background:rgba(0,0,0,.65);color:#fff;border:none;border-radius:6px;padding:4px 9px;font-size:10px;font-weight:600;cursor:pointer;backdrop-filter:blur(4px)">🖼 Photo</button>
+    </div>`;
+  }
+}
+function _toggleModalImg(){
+  _modalImgMode=_modalImgMode==='photo'?'analytics':'photo';
+  _renderModalImg(_modalCid);
+}
+
 function openModal(cid){
+  _modalCid=cid; _modalImgMode='photo';
   const c=CMAP[cid]; if(!c)return;
   const cml=ML.creative_ml[c.creative_id]||{};
   document.getElementById('m-title').textContent=c.headline||`Creative #${cid}`;
   document.getElementById('m-sub').textContent=`${c.advertiser_name} · ${c.app_name} · ${c.ad_format} · KPI: ${c.kpi_goal||'?'} · Cluster C${cml.cluster??'?'}`;
-  document.getElementById('m-img').innerHTML=generateCreativePreview(c);
+  _renderModalImg(cid);
   const kpiM=KPI_METRIC[c.kpi_goal], kpiL=KPI_LABEL[c.kpi_goal]||'KPI';
   document.getElementById('m-stats').innerHTML=`
     <div class="sb" title="Click to explain" onclick="explainMetricInContext(${cid},'overall_ctr')" style="cursor:pointer">
@@ -2359,6 +2387,18 @@ function generateCreativePreview(c){
 document.addEventListener('DOMContentLoaded',init);
 </script>
 
+<!-- ── CHATBOT INTRO BUBBLE ────────────────────────────────────────────────── -->
+<div id="chat-bubble" style="display:none;position:fixed;bottom:86px;right:22px;z-index:10000;max-width:230px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px 10px;box-shadow:0 6px 24px rgba(0,0,0,.5);animation:fadeInUp .35s ease">
+  <div style="font-size:13px;font-weight:700;margin-bottom:5px">👋 Hey, I'm Gemini!</div>
+  <div style="font-size:11px;color:var(--muted);line-height:1.6">Your creative strategy AI. Ask me anything about your creatives, KPIs, fatigue signals, or how any part of this dashboard works.</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+    <button onclick="openChatFromBubble()" style="background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;border:none;border-radius:7px;padding:5px 13px;font-size:11px;font-weight:700;cursor:pointer">Let's chat →</button>
+    <button onclick="closeChatBubble()" style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;text-decoration:underline">Dismiss</button>
+  </div>
+  <div style="position:absolute;bottom:-7px;right:20px;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:7px solid var(--border)"></div>
+  <div style="position:absolute;bottom:-6px;right:21px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid var(--surface)"></div>
+</div>
+
 <!-- ── CHATBOT FAB & PANEL ─────────────────────────────────────────────────── -->
 <button class="chat-fab" onclick="toggleChat()" title="Ask Gemini">💬</button>
 <div class="chat-panel" id="chat-panel">
@@ -2383,5 +2423,29 @@ document.addEventListener('DOMContentLoaded',init);
   </div>
 </div>
 
+<style>
+@keyframes fadeInUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+</style>
+<script>
+function closeChatBubble(){
+  document.getElementById('chat-bubble').style.display='none';
+  try{localStorage.setItem('smadex_bubble_seen','1');}catch(e){}
+}
+function openChatFromBubble(){
+  closeChatBubble();
+  toggleChat();
+}
+// Show bubble 1.5s after load, only once per browser
+window.addEventListener('load',function(){
+  setTimeout(function(){
+    var seen=false;
+    try{seen=!!localStorage.getItem('smadex_bubble_seen');}catch(e){}
+    if(!seen){
+      document.getElementById('chat-bubble').style.display='block';
+      setTimeout(closeChatBubble,9000);
+    }
+  },1500);
+});
+</script>
 </body>
 </html>
