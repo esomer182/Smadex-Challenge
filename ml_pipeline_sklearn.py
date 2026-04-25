@@ -136,7 +136,7 @@ TABULAR = [
     "n_countries",
 ]
 
-CAT_COLS = ["ad_format", "vertical", "theme", "tone", "os", "language", "target_age_segment", "hook_type"]
+CAT_COLS = ["ad_format", "vertical", "theme", "tone", "os", "language", "target_age_segment", "hook_type", "dominant_color"]
 le_map   = {}
 for col in CAT_COLS:
     if col in creatives_df.columns:

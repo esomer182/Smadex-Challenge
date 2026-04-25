@@ -475,45 +475,83 @@ tr:hover td{background:#ffffff05}
           <select id="pred-os"><option value="">✨ Auto – find best</option><option value="Both">Both (iOS + Android)</option><option value="iOS">iOS only</option><option value="Android">Android only</option></select></div>
         <div class="fg"><label>KPI Goal <span style="color:var(--danger);font-size:10px">required</span></label>
           <select id="pred-kpi"><option value="CPA">CPA (conversions)</option><option value="ROAS">ROAS (revenue)</option><option value="IPM">IPM (installs)</option><option value="CTR">CTR (clicks)</option></select></div>
-        <div class="fg"><label>Duration (seconds)</label>
-          <input type="number" id="pred-duration" value="30" min="5" max="120"/></div>
-        <div class="fg"><label>Text Density (0–1)</label>
-          <input type="number" id="pred-textdensity" value="0.4" min="0" max="1" step="0.05"/></div>
+        <div class="fg"><label>Duration (s) <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <div style="display:flex;gap:7px;align-items:center">
+            <input type="number" id="pred-duration" value="30" min="5" max="120" style="flex:1"/>
+            <label style="font-size:11px;display:flex;align-items:center;gap:4px;white-space:nowrap;cursor:pointer;color:var(--purple)">
+              <input type="checkbox" id="pred-duration-auto" onchange="togglePredAuto(this,'pred-duration')"> ✨ Auto
+            </label>
+          </div></div>
+        <div class="fg"><label>Text Density <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <div style="display:flex;gap:7px;align-items:center">
+            <input type="number" id="pred-textdensity" value="0.4" min="0" max="1" step="0.05" style="flex:1"/>
+            <label style="font-size:11px;display:flex;align-items:center;gap:4px;white-space:nowrap;cursor:pointer;color:var(--purple)">
+              <input type="checkbox" id="pred-textdensity-auto" onchange="togglePredAuto(this,'pred-textdensity')"> ✨ Auto
+            </label>
+          </div></div>
+        <div class="fg"><label>Language <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <select id="pred-language"><option value="">✨ Auto – find best</option><option value="en">English</option><option value="es">Spanish</option><option value="de">German</option><option value="fr">French</option><option value="it">Italian</option><option value="pt">Portuguese</option><option value="ja">Japanese</option></select></div>
+        <div class="fg"><label>Hook Type <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <select id="pred-hooktype"><option value="">✨ Auto – find best</option><option value="challenge">Challenge</option><option value="story">Story</option><option value="before-after">Before / After</option><option value="last-minute deal">Last-minute Deal</option><option value="competition">Competition</option><option value="cashback">Cashback</option><option value="social proof">Social Proof</option><option value="tutorial">Tutorial</option><option value="comparison">Comparison</option><option value="fomo">FOMO</option></select></div>
+        <div class="fg" style="grid-column:1/-1">
+          <label>Dominant Color <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <input type="hidden" id="pred-color" value=""/>
+          <div id="pred-color-swatches" style="display:flex;flex-wrap:wrap;gap:7px;margin-top:5px;align-items:center">
+            <div onclick="selectPredColor(this,'');" data-color="" style="cursor:pointer;font-size:11px;font-weight:600;color:var(--purple);background:rgba(139,92,246,0.12);border:2px solid var(--purple);border-radius:20px;padding:3px 11px;user-select:none" id="pred-color-auto">\u2728 Auto</div>
+            <div onclick="selectPredColor(this,'blue');" data-color="blue" title="Blue" style="cursor:pointer;width:26px;height:26px;border-radius:50%;background:#4a90e2;border:2px solid transparent;flex-shrink:0"></div>
+            <div onclick="selectPredColor(this,'purple');" data-color="purple" title="Purple" style="cursor:pointer;width:26px;height:26px;border-radius:50%;background:#9b59b6;border:2px solid transparent;flex-shrink:0"></div>
+            <div onclick="selectPredColor(this,'orange');" data-color="orange" title="Orange" style="cursor:pointer;width:26px;height:26px;border-radius:50%;background:#e67e22;border:2px solid transparent;flex-shrink:0"></div>
+            <div onclick="selectPredColor(this,'lime');" data-color="lime" title="Lime" style="cursor:pointer;width:26px;height:26px;border-radius:50%;background:#b5e853;border:2px solid transparent;flex-shrink:0"></div>
+            <div onclick="selectPredColor(this,'black');" data-color="black" title="Black" style="cursor:pointer;width:26px;height:26px;border-radius:50%;background:#222;border:2px solid transparent;flex-shrink:0"></div>
+            <div onclick="selectPredColor(this,'red');" data-color="red" title="Red" style="cursor:pointer;width:26px;height:26px;border-radius:50%;background:#e74c3c;border:2px solid transparent;flex-shrink:0"></div>
+            <div onclick="selectPredColor(this,'white');" data-color="white" title="White" style="cursor:pointer;width:26px;height:26px;border-radius:50%;background:#f0f0f0;border:2px solid var(--border);flex-shrink:0"></div>
+            <div onclick="selectPredColor(this,'teal');" data-color="teal" title="Teal" style="cursor:pointer;width:26px;height:26px;border-radius:50%;background:#1abc9c;border:2px solid transparent;flex-shrink:0"></div>
+            <div onclick="selectPredColor(this,'yellow');" data-color="yellow" title="Yellow" style="cursor:pointer;width:26px;height:26px;border-radius:50%;background:#f1c40f;border:2px solid transparent;flex-shrink:0"></div>
+            <div onclick="selectPredColor(this,'green');" data-color="green" title="Green" style="cursor:pointer;width:26px;height:26px;border-radius:50%;background:#2ecc71;border:2px solid transparent;flex-shrink:0"></div>
+            <div onclick="selectPredColor(this,'pink');" data-color="pink" title="Pink" style="cursor:pointer;width:26px;height:26px;border-radius:50%;background:#ff6b8a;border:2px solid transparent;flex-shrink:0"></div>
+            <div onclick="selectPredColor(this,'beige');" data-color="beige" title="Beige" style="cursor:pointer;width:26px;height:26px;border-radius:50%;background:#d4b896;border:2px solid transparent;flex-shrink:0"></div>
+          </div>
+        </div>
       </div>
-      <div style="display:flex;flex-wrap:wrap;gap:12px;margin:14px 0">
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
-          <input type="checkbox" id="pred-gameplay"> Has gameplay footage</label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
-          <input type="checkbox" id="pred-ugc"> UGC-style content</label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
-          <input type="checkbox" id="pred-price"> Shows price</label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
-          <input type="checkbox" id="pred-badge"> Has discount badge</label>
+      <div class="pred-form" style="margin-top:12px">
+        <div class="fg"><label>Gameplay Footage <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <select id="pred-gameplay"><option value="">✨ Auto</option><option value="1">Yes</option><option value="0">No</option></select></div>
+        <div class="fg"><label>UGC-Style Content <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <select id="pred-ugc"><option value="">✨ Auto</option><option value="1">Yes</option><option value="0">No</option></select></div>
+        <div class="fg"><label>Shows Price <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <select id="pred-price"><option value="">✨ Auto</option><option value="1">Yes</option><option value="0">No</option></select></div>
+        <div class="fg"><label>Discount Badge <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <select id="pred-badge"><option value="">✨ Auto</option><option value="1">Yes</option><option value="0">No</option></select></div>
       </div>
-      <button onclick="predictNewCreative()" style="background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;width:100%">⚡ Predict Performance</button>
-      <div id="pred-result" style="margin-top:0"></div>
+      <button onclick="predictNewCreative()" style="margin-top:16px;background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;width:100%">⚡ Predict Performance</button>
+      <div id="pred-result"></div>
     </div>
     <div class="card">
       <h3>How it works</h3>
-      <p style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:12px">
-        The predictor uses patterns from the full 1 080-creative dataset to estimate performance of an untested configuration.
-      </p>
       <div style="display:flex;flex-direction:column;gap:10px">
         <div style="background:var(--surface2);border-radius:8px;padding:11px 14px;font-size:11px">
-          <div style="font-weight:700;color:var(--accent);margin-bottom:4px">① Cluster matching</div>
-          Finds which of the 8 K-Means clusters your creative profile resembles most, based on format, vertical, theme and tone.
+          <div style="font-weight:700;color:var(--accent);margin-bottom:5px">① Score prediction</div>
+          Starts from the average performance score of the K-Means cluster most associated with your format/vertical/theme. Then applies per-KPI feature importance adjustments — each creative attribute (gameplay, UGC, duration, text density…) shifts the score up or down proportionally to how much the Random Forest model weighted it for that specific KPI goal.
         </div>
         <div style="background:var(--surface2);border-radius:8px;padding:11px 14px;font-size:11px">
-          <div style="font-weight:700;color:var(--purple);margin-bottom:4px">② Feature adjustments</div>
-          Applies boosts and penalties from the Random Forest feature importance for your specific KPI goal.
+          <div style="font-weight:700;color:var(--accent);margin-bottom:5px">② Metric estimates (CTR, ROAS, CPA, IPM)</div>
+          Computed as the average of the actual measured metric across all dataset creatives that match your format + vertical + theme + KPI goal. The closer the match, the more reliable the estimate.
         </div>
         <div style="background:var(--surface2);border-radius:8px;padding:11px 14px;font-size:11px">
-          <div style="font-weight:700;color:var(--accent2);margin-bottom:4px">③ Similar creatives</div>
-          Surfaces the top 3 existing creatives with the closest profile to benchmark your estimate.
+          <div style="font-weight:700;color:var(--purple);margin-bottom:5px">③ How ✨ Auto-fill finds best values</div>
+          For each field left on Auto, the system filters the dataset to creatives in the same <strong>vertical + KPI goal</strong> (then narrows further by format and theme where possible). It groups by every distinct value of that field and computes the average of the <em>actual measured KPI metric</em> for each group — <strong>CTR</strong> for CTR goals, <strong>ROAS</strong> for ROAS goals, <strong>IPM</strong> for IPM goals, and <strong>CPA</strong> (lowest wins) for CPA goals. The value with the best average KPI metric is selected. Groups with fewer than 3 creatives are skipped to avoid noise.
         </div>
         <div style="background:var(--surface2);border-radius:8px;padding:11px 14px;font-size:11px">
-          <div style="font-weight:700;color:var(--warn);margin-bottom:4px">⚠ Limitations</div>
-          This is a heuristic estimate. Re-run <code>ml_pipeline_sklearn.py</code> locally to embed full PCA inference (sklearn model parameters) for higher accuracy.
+          <div style="font-weight:700;color:var(--purple);margin-bottom:5px">④ Binary flag auto-fill (Yes / No)</div>
+          For Gameplay, UGC, Price, and Discount Badge, the system splits dataset creatives into two groups (flag = on vs off) and compares their average KPI metric. The flag state with the better average wins. <strong>Hard rule:</strong> Gameplay Footage and the Gameplay theme are always set to No / overridden for non-Gaming verticals, regardless of what the data suggests, since gameplay footage in a fintech or travel ad makes no creative sense.
+        </div>
+        <div style="background:var(--surface2);border-radius:8px;padding:11px 14px;font-size:11px">
+          <div style="font-weight:700;color:var(--accent2);margin-bottom:5px">⑤ Similar creatives</div>
+          The 3 existing creatives most similar to your spec are shown for benchmarking. Similarity is based on matching the binary flags you specified (gameplay, UGC), then sorted by actual performance score.
+        </div>
+        <div style="background:var(--surface2);border-radius:8px;padding:11px 14px;font-size:11px">
+          <div style="font-weight:700;color:var(--warn);margin-bottom:5px">⚠ Limitations</div>
+          This is a heuristic estimate, not a trained regression output. Small pools (unusual format + vertical combos) reduce accuracy. Re-run <code>ml_pipeline_sklearn.py</code> to retrain the models with any new data.
         </div>
       </div>
       <div style="margin-top:16px">
@@ -1652,6 +1690,109 @@ async function explainCreative(cid){
 }
 
 // ── PREDICT CREATIVE ──────────────────────────────────────────────────────────
+function togglePredAuto(chk,inputId){
+  const inp=document.getElementById(inputId);
+  inp.disabled=chk.checked;
+  inp.style.opacity=chk.checked?'0.35':'1';
+}
+
+function applyPredFills(){
+  const p=window._lastPrediction;
+  if(!p||!p._resolvedSpec)return;
+  const spec=p._resolvedSpec;
+  // Simple selects
+  ['pred-format','pred-theme','pred-tone','pred-os','pred-language','pred-hooktype',
+   'pred-gameplay','pred-ugc','pred-price','pred-badge'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el&&spec[id]!=null)el.value=spec[id];
+  });
+  // Numeric: uncheck auto checkbox, restore field, set value
+  ['duration','textdensity'].forEach(key=>{
+    const inp=document.getElementById('pred-'+key);
+    const chk=document.getElementById('pred-'+key+'-auto');
+    if(inp&&spec['pred-'+key]!=null){
+      if(chk){chk.checked=false;}
+      inp.disabled=false; inp.style.opacity='1';
+      inp.value=spec['pred-'+key];
+    }
+  });
+  // Color swatch
+  if(spec['pred-color']){
+    const sw=document.querySelector('#pred-color-swatches [data-color="'+spec['pred-color']+'"]');
+    if(sw)selectPredColor(sw,spec['pred-color']);
+  }
+  // Re-run prediction with the filled values
+  predictNewCreative();
+}
+
+function selectPredColor(el,color){
+  document.querySelectorAll('#pred-color-swatches [data-color]').forEach(s=>{
+    if(s.id==='pred-color-auto'){
+      s.style.border='2px solid '+(s===el?'var(--purple)':'transparent');
+      s.style.background=s===el?'rgba(139,92,246,0.12)':'transparent';
+    }else{
+      s.style.border='2px solid '+(s===el?'#fff':'transparent');
+      s.style.boxShadow=s===el?'0 0 0 2px var(--accent)':'none';
+    }
+  });
+  document.getElementById('pred-color').value=color;
+}
+
+const _PRED_KPI_FIELD={CTR:'overall_ctr',ROAS:'overall_roas',IPM:'overall_ipm',CPA:'cpa'};
+const _PRED_KPI_LOW={CPA:true};
+
+function _predBestVal(field,pool,kpi){
+  const mf=_PRED_KPI_FIELD[kpi]||'perf_score';
+  const low=!!_PRED_KPI_LOW[kpi];
+  const agg={};
+  pool.forEach(c=>{
+    const v=c[field]; if(v==null||v==='')return;
+    const m=c[mf]; if(m==null||m<=0)return;
+    if(!agg[v]){agg[v]={sum:0,n:0};}
+    agg[v].sum+=m; agg[v].n++;
+  });
+  let best=null,bestAvg=low?Infinity:-Infinity;
+  // Pass 1: require ≥3 data points for statistical confidence
+  for(const [v,d] of Object.entries(agg)){
+    if(d.n<3)continue;
+    const avg=d.sum/d.n;
+    if(low?avg<bestAvg:avg>bestAvg){bestAvg=avg;best=v;}
+  }
+  if(!best){  // Pass 2: relax to any sample
+    bestAvg=low?Infinity:-Infinity;
+    for(const [v,d] of Object.entries(agg)){
+      const avg=d.sum/d.n;
+      if(low?avg<bestAvg:avg>bestAvg){bestAvg=avg;best=v;}
+    }
+  }
+  return best;
+}
+
+function _predBestBinary(field,pool,kpi){
+  const mf=_PRED_KPI_FIELD[kpi]||'perf_score';
+  const low=!!_PRED_KPI_LOW[kpi];
+  let s0=0,n0=0,s1=0,n1=0;
+  pool.forEach(c=>{
+    const m=c[mf]; if(m==null||m<=0)return;
+    if(c[field]){s1+=m;n1++;}else{s0+=m;n0++;}
+  });
+  if(!n0&&!n1)return null;
+  const a0=n0?(s0/n0):(low?0:Infinity);
+  const a1=n1?(s1/n1):(low?0:Infinity);
+  return (low?a1<a0:a1>a0);
+}
+
+function _predBestNumeric(field,pool,kpi){
+  const mf=_PRED_KPI_FIELD[kpi]||'perf_score';
+  const low=!!_PRED_KPI_LOW[kpi];
+  const valid=pool.filter(c=>c[field]!=null&&(c[mf]||0)>0);
+  if(!valid.length)return null;
+  const sorted=[...valid].sort((a,b)=>low?(a[mf]||0)-(b[mf]||0):(b[mf]||0)-(a[mf]||0));
+  const top=sorted.slice(0,Math.max(1,Math.ceil(sorted.length*0.25)));
+  const vals=top.map(c=>c[field]).sort((a,b)=>a-b);
+  return parseFloat(vals[Math.floor(vals.length/2)]);
+}
+
 async function explainPrediction(){
   const p=window._lastPrediction;
   if(!p) return;
@@ -1671,6 +1812,7 @@ async function explainPrediction(){
     '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n'+
     'Format: '+p.fmt+' | Vertical: '+p.vert+' | Theme: '+p.theme+'\n'+
     'Tone: '+p.tone+' | OS: '+p.osTarget+' | KPI Goal: '+p.kpi+'\n'+
+    'Language: '+(p.language||'?')+' | Hook Type: '+(p.hookType||'?')+' | Dominant Color: '+(p.colorVal||'?')+'\n'+
     'Duration: '+p.dur+'s | Text density: '+(p.td*100).toFixed(0)+'%\n'+
     'Has gameplay: '+(p.hasGP?'yes':'no')+' | UGC style: '+(p.hasUGC?'yes':'no')+'\n'+
     'Shows price: '+(p.hasPrice?'yes':'no')+' | Discount badge: '+(p.hasBadge?'yes':'no')+'\n\n'+
@@ -1680,7 +1822,7 @@ async function explainPrediction(){
     '\u2022 Expected CTR: '+(p.avgCTR*100).toFixed(2)+'%\n'+
     '\u2022 Expected ROAS: '+p.avgROAS.toFixed(2)+'x\n'+
     '\u2022 Expected IPM: '+p.avgIPM.toFixed(1)+'\n'+
-    '\u2022 Expected CPA: $'+p.avgCPA.toFixed(2)+'\n'+
+    '\u2022 Expected CPA: '+(p.avgCPA!=null?'$'+p.avgCPA.toFixed(2)+' (lower is better)':'N/A')+'\n'+
     '\u2022 Based on '+p.base+' similar creatives \u2014 best cluster: C'+(p.bestCluster||'?')+'\n\n'+
     'TASK: Write a 4\u20135 sentence explanation covering:\n'+
     '(1) Why this specific combination of format/theme/tone/flags is predicted to perform this way for a '+p.kpi+' campaign\n'+
@@ -1707,62 +1849,110 @@ function predictNewCreative(){
   let tone=document.getElementById('pred-tone').value;
   const kpi=document.getElementById('pred-kpi').value;
   let osTarget=document.getElementById('pred-os').value;
-  const dur=parseFloat(document.getElementById('pred-duration').value)||30;
-  const td=parseFloat(document.getElementById('pred-textdensity').value)||0.4;
-  const hasGP=document.getElementById('pred-gameplay').checked;
-  const hasUGC=document.getElementById('pred-ugc').checked;
-  const hasPrice=document.getElementById('pred-price').checked;
-  const hasBadge=document.getElementById('pred-badge').checked;
+  let language=document.getElementById('pred-language').value;
+  let hookType=document.getElementById('pred-hooktype').value;
+  let colorVal=document.getElementById('pred-color').value;
+  const durAuto=document.getElementById('pred-duration-auto').checked;
+  const tdAuto=document.getElementById('pred-textdensity-auto').checked;
+  let dur=durAuto?null:parseFloat(document.getElementById('pred-duration').value)||30;
+  let td=tdAuto?null:parseFloat(document.getElementById('pred-textdensity').value)||0.4;
+  // Binary flags: "" = auto, "1" = yes, "0" = no
+  const gpVal=document.getElementById('pred-gameplay').value;
+  const ugcVal=document.getElementById('pred-ugc').value;
+  const priceVal=document.getElementById('pred-price').value;
+  const badgeVal=document.getElementById('pred-badge').value;
 
-  // --- Auto-resolve blank fields: find best value by avg perf_score ---
+  // --- Auto-resolve: KPI-aware best-value finder ---
   const autoFields=[];
-  const baseForAuto=C.filter(c=>c.vertical===vert&&c.kpi_goal===kpi).length
-    ? C.filter(c=>c.vertical===vert&&c.kpi_goal===kpi)
-    : C;
-  function bestValFor(field,pool){
-    const agg={};
-    pool.forEach(c=>{const v=c[field];if(v==null||v==='')return;if(!agg[v]){agg[v]={sum:0,n:0};}agg[v].sum+=(c.perf_score||0);agg[v].n++;});
-    let best=null,bestAvg=-1;
-    for(const [v,d] of Object.entries(agg)){const avg=d.sum/d.n;if(avg>bestAvg){bestAvg=avg;best=v;}}
-    return best;
-  }
-  if(!fmt){
-    const v=bestValFor('ad_format',baseForAuto)||'rewarded_video';
-    fmt=v; autoFields.push({field:'Ad Format',value:v});
-  }
-  if(!theme){
-    const pool2=baseForAuto.filter(c=>c.ad_format===fmt);
-    const v=bestValFor('theme',pool2.length?pool2:baseForAuto)||'gameplay';
-    theme=v; autoFields.push({field:'Theme',value:v});
-  }
-  if(!tone){
-    const pool3=baseForAuto.filter(c=>c.ad_format===fmt&&c.theme===theme);
-    const v=bestValFor('tone',pool3.length?pool3:baseForAuto)||'excited';
-    tone=v; autoFields.push({field:'Tone',value:v});
-  }
-  if(!osTarget){
-    const v=bestValFor('os',baseForAuto)||'Both';
-    osTarget=v; autoFields.push({field:'OS Target',value:v});
+  const nonGamingOverrides=[]; // hard-rule violations
+  const isGaming=vert==='gaming';
+  const kpiPool=C.filter(c=>c.vertical===vert&&c.kpi_goal===kpi);
+  const baseForAuto=kpiPool.length?kpiPool:C;
+
+  function resolveAuto(fieldKey,currentVal,dataField,fallback,narrowPool){
+    if(currentVal!=='')return currentVal;
+    const pool=narrowPool&&narrowPool.length?narrowPool:baseForAuto;
+    const v=_predBestVal(dataField,pool,kpi)||fallback;
+    autoFields.push({field:fieldKey,value:v});
+    return v;
   }
 
-  // --- Cluster matching & score ---
+  fmt=resolveAuto('Ad Format',fmt,'ad_format','rewarded_video');
+
+  // HARD RULE: gameplay theme only for gaming vertical
+  const themePoolRaw=baseForAuto.filter(c=>c.ad_format===fmt);
+  const themePool=isGaming?themePoolRaw:themePoolRaw.filter(c=>c.theme!=='gameplay');
+  if(!isGaming&&theme==='gameplay'){
+    // User manually selected gameplay for a non-gaming vertical — override
+    const alt=_predBestVal('theme',themePool.length?themePool:baseForAuto.filter(c=>c.theme!=='gameplay'),kpi)||'product-focus';
+    nonGamingOverrides.push('Theme \u201cgameplay\u201d \u2192 \u201c'+alt+'\u201d (gameplay is only meaningful for Gaming verticals)');
+    theme=alt;
+  } else {
+    theme=resolveAuto('Theme',theme,'theme','product-focus',themePool);
+  }
+
+  tone=resolveAuto('Tone',tone,'tone','excited',baseForAuto.filter(c=>c.ad_format===fmt&&c.theme===theme));
+  osTarget=resolveAuto('OS Target',osTarget,'os','Both');
+  language=resolveAuto('Language',language,'language','en');
+  hookType=resolveAuto('Hook Type',hookType,'hook_type','story');
+  // dominant_color: auto-recommended (now also in ML pipeline after retraining)
+  const colorIsAuto=colorVal==='';
+  if(colorIsAuto){
+    const bestColor=_predBestVal('dominant_color',baseForAuto,kpi);
+    if(bestColor){colorVal=bestColor;autoFields.push({field:'Dominant Color',value:bestColor});}
+  }
+
+  // Resolve binary flags
+  function resolveBinary(fieldKey,val,dataField){
+    // HARD RULE: gameplay footage only for gaming vertical
+    if(dataField==='has_gameplay'&&!isGaming){
+      if(val==='1')nonGamingOverrides.push('Gameplay Footage overridden to No (not applicable outside Gaming)');
+      return false;
+    }
+    if(val!=='')return val==='1';
+    const result=_predBestBinary(dataField,baseForAuto,kpi);
+    if(result==null)return false;
+    autoFields.push({field:fieldKey,value:result?'Yes':'No'});
+    return result;
+  }
+  const hasGP=resolveBinary('Gameplay Footage',gpVal,'has_gameplay');
+  const hasUGC=resolveBinary('UGC Style',ugcVal,'has_ugc_style');
+  const hasPrice=resolveBinary('Shows Price',priceVal,'has_price');
+  const hasBadge=resolveBinary('Discount Badge',badgeVal,'has_discount_badge');
+
+  // Resolve numeric fields
+  if(dur==null){
+    const v=_predBestNumeric('duration_sec',baseForAuto,kpi);
+    dur=v!=null?v:30;
+    autoFields.push({field:'Duration',value:dur.toFixed(0)+'s'});
+  }
+  if(td==null){
+    const v=_predBestNumeric('text_density',baseForAuto,kpi);
+    td=v!=null?v:0.4;
+    autoFields.push({field:'Text Density',value:(td*100).toFixed(0)+'%'});
+  }
+
+  // --- Cluster matching ---
   const matches=C.filter(c=>c.ad_format===fmt&&c.vertical===vert&&c.theme===theme&&c.kpi_goal===kpi);
   const pool=matches.length?matches:C.filter(c=>c.ad_format===fmt&&c.vertical===vert&&c.kpi_goal===kpi);
   const wider=pool.length?pool:C.filter(c=>c.ad_format===fmt&&c.kpi_goal===kpi);
-  const base=wider.length?wider:C;
+  let base=wider.length?wider:C;
+  // Narrow by dominant_color if specified (need ≥5 to keep estimates stable)
+  if(colorVal){const cb=base.filter(c=>c.dominant_color===colorVal);if(cb.length>=5)base=cb;}
 
   const clusterCounts={};
   base.forEach(c=>{const cl=(ML.creative_ml[c.creative_id]||{}).cluster;if(cl!=null)clusterCounts[cl]=(clusterCounts[cl]||0)+1;});
   const bestCluster=Object.entries(clusterCounts).sort((a,b)=>b[1]-a[1])[0]?.[0];
   const cp=bestCluster?ML.cluster_profiles[bestCluster]||{}:{};
 
+  // --- Score with FI adjustments (skip auto fields to avoid neutral-penalizing) ---
   let score=cp.avg_perf||0.5;
   const fi=ML.feature_importance['kpi_'+kpi]||ML.feature_importance['perf_score']||[];
   const adj=(name,val)=>{const f=fi.find(x=>x.name.replace(/_enc$/,'')===name);if(!f)return;score+=f.importance*(val-0.5)*0.4;};
-  if(hasGP) adj('has_gameplay',1); else adj('has_gameplay',0);
-  if(hasUGC) adj('has_ugc_style',1); else adj('has_ugc_style',0);
-  if(hasPrice) adj('has_price',1); else adj('has_price',0);
-  if(hasBadge) adj('has_discount_badge',1); else adj('has_discount_badge',0);
+  adj('has_gameplay',hasGP?1:0);
+  adj('has_ugc_style',hasUGC?1:0);
+  adj('has_price',hasPrice?1:0);
+  adj('has_discount_badge',hasBadge?1:0);
   adj('duration_sec',Math.min(1,dur/120));
   adj('text_density',td);
   score=Math.max(0.05,Math.min(0.98,score));
@@ -1774,14 +1964,15 @@ function predictNewCreative(){
   else if(score>=0.35){band='Needs optimisation';bandColor='var(--warn)';}
   else{band='High risk of underperformance';bandColor='var(--danger)';}
 
-  // --- Secondary metrics from base pool ---
+  // --- Metrics from base pool ---
   const avgCTR=base.reduce((s,c)=>s+(c.overall_ctr||0),0)/base.length;
   const avgROAS=base.reduce((s,c)=>s+(c.overall_roas||0),0)/base.length;
   const avgIPM=base.reduce((s,c)=>s+(c.overall_ipm||0),0)/base.length;
-  const cpaBases=base.filter(c=>(c.overall_cpa||0)>0);
-  const avgCPA=cpaBases.length?cpaBases.reduce((s,c)=>s+(c.overall_cpa||0),0)/cpaBases.length:0;
+  const cpaPool=base.filter(c=>(c.cpa||0)>0);
+  const avgCPA=cpaPool.length?cpaPool.reduce((s,c)=>s+(c.cpa||0),0)/cpaPool.length:null;
+  const cpaStr=avgCPA!=null?'$'+avgCPA.toFixed(2):'N/A';
 
-  const KPI_PRIMARY_VAL={CTR:(avgCTR*100).toFixed(2)+'%',ROAS:avgROAS.toFixed(2)+'x',IPM:avgIPM.toFixed(1),CPA:'$'+avgCPA.toFixed(2)};
+  const KPI_PRIMARY_VAL={CTR:(avgCTR*100).toFixed(2)+'%',ROAS:avgROAS.toFixed(2)+'x',IPM:avgIPM.toFixed(1),CPA:cpaStr};
   const KPI_PRIMARY_LBL={CTR:'CTR',ROAS:'ROAS',IPM:'IPM',CPA:'CPA'};
   const KPI_PRIMARY_DESC={CTR:'click-through rate',ROAS:'return on ad spend',IPM:'installs per mille',CPA:'cost per acquisition'};
   const KPI_PRIMARY_COLOR={CTR:'var(--accent)',ROAS:'var(--purple)',IPM:'var(--top)',CPA:'var(--accent2)'};
@@ -1795,21 +1986,35 @@ function predictNewCreative(){
     kpi!=='CTR'&&{label:'CTR',val:(avgCTR*100).toFixed(2)+'%',color:'var(--accent)'},
     kpi!=='ROAS'&&{label:'ROAS',val:avgROAS.toFixed(2)+'x',color:'var(--purple)'},
     kpi!=='IPM'&&{label:'IPM',val:avgIPM.toFixed(1),color:'var(--top)'},
-    kpi!=='CPA'&&{label:'CPA',val:'$'+avgCPA.toFixed(2),color:'var(--accent2)'},
+    kpi!=='CPA'&&{label:'CPA',val:cpaStr,color:'var(--accent2)'},
   ].filter(Boolean);
+
+  // --- Hard-rule override warning banner ---
+  const overrideHTML=nonGamingOverrides.length?`
+    <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.4);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:11px">
+      <div style="font-weight:700;color:var(--warn);margin-bottom:5px">\u26A0 Configuration adjusted</div>
+      ${nonGamingOverrides.map(m=>`<div style="color:var(--text);margin-top:3px">\u2022 ${m}</div>`).join('')}
+    </div>`:'';
 
   // --- Auto recommendations banner ---
   const autoHTML=autoFields.length?`
     <div style="background:linear-gradient(135deg,rgba(99,102,241,0.12),rgba(139,92,246,0.12));border:1px solid rgba(99,102,241,0.35);border-radius:10px;padding:12px 16px;margin-bottom:16px">
-      <div style="font-size:11px;font-weight:700;color:var(--purple);margin-bottom:8px">\u2728 Recommended values to maximise ${kpi}:</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px">
-        ${autoFields.map(f=>`<div style="background:var(--surface2);border-radius:6px;padding:5px 12px;font-size:11px"><span style="color:var(--muted)">${f.field}:</span> <strong style="color:var(--accent)">${f.value}</strong></div>`).join('')}
+      <div style="font-size:11px;font-weight:700;color:var(--purple);margin-bottom:8px">\u2728 Best settings found for your ${kpi} goal:</div>
+      <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px">
+        ${autoFields.map(f=>`<div style="background:var(--surface2);border-radius:6px;padding:4px 11px;font-size:11px"><span style="color:var(--muted)">${f.field}:</span> <strong style="color:var(--accent)">${f.value}</strong></div>`).join('')}
       </div>
-      <div style="font-size:10px;color:var(--muted);margin-top:8px">Set these values in the form above to get the best predicted outcome for your ${kpi} goal.</div>
+      <button onclick="applyPredFills()" style="background:var(--purple);color:#fff;border:none;border-radius:7px;padding:6px 16px;font-size:11px;font-weight:700;cursor:pointer">\u2191 Apply to form &amp; re-run</button>
     </div>`:'';
 
-  // Store for AI explain
-  window._lastPrediction={fmt,vert,theme,tone,kpi,osTarget,dur,td,hasGP,hasUGC,hasPrice,hasBadge,score,band,autoFields,avgCTR,avgROAS,avgIPM,avgCPA,bestCluster,base:base.length};
+  // Store for AI explain + apply-to-form
+  const _resolvedSpec={
+    'pred-format':fmt,'pred-theme':theme,'pred-tone':tone,'pred-os':osTarget,
+    'pred-language':language,'pred-hooktype':hookType,'pred-color':colorVal,
+    'pred-gameplay':hasGP?'1':'0','pred-ugc':hasUGC?'1':'0',
+    'pred-price':hasPrice?'1':'0','pred-badge':hasBadge?'1':'0',
+    'pred-duration':dur.toFixed(0),'pred-textdensity':td.toFixed(2)
+  };
+  window._lastPrediction={fmt,vert,theme,tone,kpi,osTarget,language,hookType,colorVal,dur,td,hasGP,hasUGC,hasPrice,hasBadge,score,band,autoFields,avgCTR,avgROAS,avgIPM,avgCPA,bestCluster,base:base.length,_resolvedSpec};
 
   const similar=[...base].sort((a,b)=>{
     const aGP=a.has_gameplay===hasGP?1:0,bGP=b.has_gameplay===hasGP?1:0;
@@ -1819,7 +2024,7 @@ function predictNewCreative(){
 
   document.getElementById('pred-result').innerHTML=`
     <div class="pred-result">
-      ${autoHTML}
+      ${overrideHTML}${autoHTML}
       <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Expected ${primaryDesc} for your ${kpi} goal</div>
       <div style="font-size:56px;font-weight:800;color:${primaryColor};line-height:1;margin-bottom:2px">${primaryVal}</div>
       <div style="font-size:13px;font-weight:600;color:${primaryColor};margin-bottom:8px">${KPI_PRIMARY_LBL[kpi]}${cpaSuffix}</div>
@@ -1837,7 +2042,7 @@ function predictNewCreative(){
       </div>
       <div class="pred-reasoning">
         Best matching cluster: C${bestCluster||'?'} (${cp.top_format||fmt} / ${cp.top_theme||theme} / ${cp.top_tone||tone}).
-        Based on ${base.length} similar creatives.
+        Based on ${base.length} similar creatives in the dataset.
         ${hasGP?'Gameplay footage is a strong positive for '+kpi+' campaigns. ':''}
         ${hasUGC?'UGC style tends to lift CTR. ':''}
         ${td>0.6?'High text density may hurt visual clarity. ':''}

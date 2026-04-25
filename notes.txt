@@ -23,3 +23,9 @@ prioritzar-la millor, i organitzar-la millor.
 - De la pàgina de portfolio optimizer, moure un bloc de visualització a dalt.
 - Fins i tot quan prioritzes performance són com molt ortogonals, sus.
 
+
+TODO:
+- When loading the page for the first time, make a pop-up from the chatbot to let the user know that it exists.
+- Show the image (or add a button to show it) for each creative from the assets/ folder when clicking on it.
+- Intentar entrenar una IA de Computer Vision per afegir features de les imatges com a tal (very low prio)
+
