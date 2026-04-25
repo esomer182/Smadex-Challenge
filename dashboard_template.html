@@ -1762,8 +1762,7 @@ In 3-4 sentences: why is this a good addition? What new creative territory does 
 
   try{
     await callGeminiStream(sys,[{role:'user',content:msg}],300,text=>{
-      container.innerHTML=`<div style="font-size:10px;color:var(--text);line-height:1.6;margin-top:4px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:6px;padding:7px 9px">${text.replace(/</g,'&lt;').replace(/
-/g,'<br>')}</div>`;
+      container.innerHTML='<div style="font-size:10px;color:var(--text);line-height:1.6;margin-top:4px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:6px;padding:7px 9px">'+text.split('\n').join('<br>')+'</div>';
     });
     btn.textContent='🤖 Why this?';btn.disabled=false;
   }catch(e){

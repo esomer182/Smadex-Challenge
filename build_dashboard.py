@@ -9,6 +9,7 @@ Usage:
 """
 
 import json
+import os
 import sys
 import getpass
 import tempfile
@@ -161,7 +162,7 @@ with open(tmp_path, "wb") as fh:
 if tmp_path.stat().st_size != total:
     print("  ERROR: /tmp write size mismatch"); sys.exit(1)
 
-CHUNK = 512 * 1024
+CHUNK = 65536  # 64 KB — smaller chunks + fsync for VirtioFS reliability
 with open(tmp_path, "rb") as src, open(OUT_HTML, "wb") as dst:
     while True:
         chunk = src.read(CHUNK)
@@ -169,6 +170,7 @@ with open(tmp_path, "rb") as src, open(OUT_HTML, "wb") as dst:
             break
         dst.write(chunk)
         dst.flush()
+    os.fsync(dst.fileno())
 
 written = OUT_HTML.stat().st_size
 if written != total:
