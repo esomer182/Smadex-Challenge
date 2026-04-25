@@ -1,0 +1,25 @@
+# ── Secret keys ───────────────────────────────────────────────────────
+# NEVER commit the .env file — it contains your Anthropic API key.
+.env
+
+# ── Built outputs ─────────────────────────────────────────────────────
+# creative_copilot.html is the BUILT file — it contains the injected API key.
+# Commit it only after verifying it holds no secrets (i.e. built without a key).
+# For sharing the live demo privately, distribute the file directly, not via Git.
+creative_copilot.html
+
+# Generated data files (large, reproducible from the CSVs)
+app_data.js
+ml_results.json
+
+# ── Python ────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ── OS ────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

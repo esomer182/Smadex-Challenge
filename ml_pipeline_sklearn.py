@@ -5,7 +5,7 @@ Run once to regenerate ml_results.json and app_data.js, then run
 build_dashboard.py to rebuild creative_copilot.html.
 
 Install dependencies:
-    pip install pandas scikit-learn xgboost shap pillow
+    pip install pandas scikit-learn xgboost shap
 
 Usage (from the dataset folder):
     python ml_pipeline_sklearn.py
@@ -18,10 +18,9 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from PIL import Image
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import KFold, cross_val_score
 from sklearn.preprocessing import LabelEncoder, StandardScaler
@@ -51,7 +50,6 @@ except ImportError:
 # ─────────────────────────────────────────────────────────────────────
 BASE      = Path(__file__).parent
 DATA_DIR  = BASE
-ASSET_DIR = BASE / "assets"
 OUT_DIR   = BASE          # app_data.js + ml_results.json land here
 
 np.random.seed(42)
@@ -67,29 +65,48 @@ daily_df     = pd.read_csv(DATA_DIR / "creative_daily_country_os_stats.csv")
 
 # ── Column aliases so the rest of the code uses clean names ──────────
 creatives_df = creatives_df.rename(columns={
-    "format":        "ad_format",
-    "emotional_tone":"tone",
-    "creative_status":"performance_status",
+    "format": "ad_format",
+    "emotional_tone": "tone",
+    "creative_status": "performance_status",
 })
 
-# ── Join campaign metadata (kpi_goal, target_os) ─────────────────────
+# ── Compute CPA = spend ÷ conversions (before any merges) ────────────
+creatives_df["cpa"] = (
+    pd.to_numeric(creatives_df["total_spend_usd"], errors="coerce") /
+    pd.to_numeric(creatives_df["total_conversions"], errors="coerce").replace(0, np.nan)
+)
+
+# ── Join campaign metadata (kpi_goal, target_os, age, countries) ─────
 creatives_df = creatives_df.merge(
-    campaigns_df[["campaign_id", "kpi_goal", "target_os"]],
+    campaigns_df[["campaign_id", "kpi_goal", "target_os", "target_age_segment", "countries"]],
     on="campaign_id",
     how="left",
 )
 # Use target_os as the OS feature (campaigns have iOS / Android / Both)
 creatives_df["os"] = creatives_df["target_os"].fillna("Both")
 
+# ── Derived features from campaign geography ──────────────────────────
+# n_countries: number of target countries (from pipe-separated string)
+creatives_df["n_countries"] = (
+    creatives_df["countries"].fillna("").astype(str)
+    .apply(lambda x: len([c for c in x.split("|") if c.strip()]))
+)
+# has_us: whether US is among target countries
+creatives_df["has_us"] = (
+    creatives_df["countries"].fillna("").astype(str)
+    .apply(lambda x: 1.0 if "US" in x.upper().split("|") else 0.0)
+)
+
 # ── Numeric coercion ─────────────────────────────────────────────────
 FLOAT_COLS = [
     "overall_ctr", "overall_cvr", "overall_roas", "overall_ipm", "perf_score",
     "ctr_decay_pct", "cvr_decay_pct", "text_density", "readability_score",
     "brand_visibility_score", "clutter_score", "novelty_score", "motion_score",
-    "duration_sec", "faces_count", "has_price", "has_discount_badge",
-    "has_gameplay", "has_ugc_style", "total_spend_usd", "total_impressions",
-    "total_conversions", "total_revenue_usd", "fatigue_day",
-    "first_7d_ctr", "last_7d_ctr", "first_7d_cvr", "last_7d_cvr",
+    "duration_sec", "faces_count", "product_count", "copy_length_chars",
+    "n_countries", "has_us",
+    "has_price", "has_discount_badge", "has_gameplay", "has_ugc_style",
+    "total_spend_usd", "total_impressions", "total_conversions", "total_revenue_usd",
+    "fatigue_day", "first_7d_ctr", "last_7d_ctr", "first_7d_cvr", "last_7d_cvr",
     "total_days_active",
 ]
 for col in FLOAT_COLS:
@@ -104,84 +121,22 @@ print("    " + creatives_df["performance_status"].value_counts().to_string().rep
 
 
 # ═════════════════════════════════════════════════════════════════════
-# 2.  IMAGE FEATURE EXTRACTION  (PIL — no deep learning required)
-# ═════════════════════════════════════════════════════════════════════
-print("\n── 2. Extracting image features ──────────────────────────────")
-
-def extract_image_features(path: Path) -> list:
-    """18 interpretable visual features per creative asset."""
-    try:
-        img = Image.open(path).convert("RGB").resize((64, 64))
-        arr = np.array(img, dtype=np.float32) / 255.0
-        r, g, b = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2]
-
-        feats = []
-        for ch in [r, g, b]:                                  # per-channel stats
-            mu, sd = ch.mean(), ch.std()
-            skew = float(np.mean(((ch - mu) / max(sd, 1e-6)) ** 3))
-            feats += [mu, sd, skew]
-
-        gray = 0.299 * r + 0.587 * g + 0.114 * b             # luminance
-        feats += [gray.mean(), gray.std()]
-
-        maxc = np.maximum(np.maximum(r, g), b)                # saturation
-        minc = np.minimum(np.minimum(r, g), b)
-        sat  = np.where(maxc > 0, (maxc - minc) / np.maximum(maxc, 1e-6), 0)
-        feats += [sat.mean(), sat.std()]
-
-        gx = np.abs(np.diff(gray, axis=1)).mean()             # edge density
-        gy = np.abs(np.diff(gray, axis=0)).mean()
-        feats += [gx, gy, (gx + gy) / 2]
-
-        h = gray.shape[0]                                      # vertical brightness
-        feats += [gray[:h//3].mean(), gray[h//3:2*h//3].mean(), gray[2*h//3:].mean()]
-
-        rg = r - g; yb = 0.5 * (r + g) - b                   # Hasler-Süsstrunk colorfulness
-        cf = (np.sqrt(rg.std()**2 + yb.std()**2)
-              + 0.3 * np.sqrt(rg.mean()**2 + yb.mean()**2))
-        feats.append(float(cf))
-
-        assert len(feats) == 18
-        return feats
-    except Exception:
-        return [0.0] * 18
-
-IMG_FEAT_NAMES = [
-    "img_r_mean", "img_r_std", "img_r_skew",
-    "img_g_mean", "img_g_std", "img_g_skew",
-    "img_b_mean", "img_b_std", "img_b_skew",
-    "img_brightness", "img_contrast",
-    "img_sat_mean", "img_sat_std",
-    "img_edge_x", "img_edge_y", "img_edge_avg",
-    "img_top_bright", "img_mid_bright", "img_bot_bright",
-]
-IMG_FEAT_NAMES = IMG_FEAT_NAMES[:18]
-
-image_feats: dict[str, list] = {}
-for _, row in creatives_df.iterrows():
-    cid  = row["creative_id"]
-    path = ASSET_DIR / f"{cid}.png"
-    if not path.exists():
-        path = ASSET_DIR / f"{cid}.jpg"
-    image_feats[cid] = extract_image_features(path)
-
-found = sum(1 for v in image_feats.values() if any(x != 0 for x in v))
-print(f"  {found}/{len(image_feats)} creatives with real image data")
-
-
-# ═════════════════════════════════════════════════════════════════════
-# 3.  FEATURE MATRIX
+# 3.  FEATURE MATRIX  (tabular + categorical + binary; no image feats)
 # ═════════════════════════════════════════════════════════════════════
 print("\n── 3. Building feature matrix ────────────────────────────────")
 
+# Only creative properties knowable BEFORE the campaign runs.
+# Outcome metrics (overall_ctr, overall_cvr, overall_roas, overall_ipm,
+# ctr_decay_pct, cvr_decay_pct) are excluded — using them as features
+# when predicting perf_score (which is derived from them) is data leakage.
 TABULAR = [
-    "overall_ctr", "overall_cvr", "overall_roas", "overall_ipm",
-    "ctr_decay_pct", "cvr_decay_pct", "duration_sec",
+    "duration_sec", "copy_length_chars", "product_count", "faces_count",
     "text_density", "readability_score", "brand_visibility_score",
-    "clutter_score", "novelty_score",
+    "clutter_score", "novelty_score", "motion_score",
+    "n_countries",
 ]
 
-CAT_COLS = ["ad_format", "vertical", "theme", "tone", "os"]
+CAT_COLS = ["ad_format", "vertical", "theme", "tone", "os", "language", "target_age_segment", "hook_type"]
 le_map   = {}
 for col in CAT_COLS:
     if col in creatives_df.columns:
@@ -192,21 +147,20 @@ for col in CAT_COLS:
         le_map[col] = le
 
 CAT_ENCODED = [f"{c}_enc" for c in CAT_COLS if c in creatives_df.columns]
-BINARY      = ["has_price", "has_discount_badge", "has_gameplay", "has_ugc_style"]
+BINARY      = ["has_price", "has_discount_badge", "has_gameplay", "has_ugc_style", "has_us"]
 for col in BINARY:
     if col in creatives_df.columns:
         creatives_df[col] = pd.to_numeric(creatives_df[col], errors="coerce").fillna(0)
 
 feat_cols = TABULAR + CAT_ENCODED + [c for c in BINARY if c in creatives_df.columns]
-ALL_FEAT_NAMES = feat_cols + IMG_FEAT_NAMES
+ALL_FEAT_NAMES = feat_cols  # no image features
 
 rows, valid_ids = [], []
 for _, row in creatives_df.iterrows():
     cid = row["creative_id"]
     tab = [float(row[c]) if c in creatives_df.columns and pd.notna(row.get(c)) else np.nan
            for c in feat_cols]
-    img = image_feats.get(cid, [0.0] * 18)
-    rows.append(tab + img)
+    rows.append(tab)
     valid_ids.append(cid)
 
 X_raw = np.array(rows, dtype=np.float64)
@@ -218,7 +172,8 @@ scaler  = StandardScaler()
 X       = scaler.fit_transform(X_imp)
 
 print(f"  Feature matrix: {X.shape[0]} × {X.shape[1]}  "
-      f"({len(feat_cols)} tabular/cat + {len(IMG_FEAT_NAMES)} image)")
+      f"({len(feat_cols)} features: {len(TABULAR)} tabular + {len(CAT_ENCODED)} categorical + "
+      f"{len([c for c in BINARY if c in creatives_df.columns])} binary)")
 
 
 # ═════════════════════════════════════════════════════════════════════
@@ -226,7 +181,7 @@ print(f"  Feature matrix: {X.shape[0]} × {X.shape[1]}  "
 # ═════════════════════════════════════════════════════════════════════
 print("\n── 4. PCA ────────────────────────────────────────────────────")
 
-N_PC   = min(20, X.shape[1], X.shape[0] - 1)
+N_PC   = min(15, X.shape[1], X.shape[0] - 1)
 pca    = PCA(n_components=N_PC, random_state=42)
 X_pca  = pca.fit_transform(X)
 
@@ -242,10 +197,11 @@ print(f"  Top-3 PC variance: {[round(v*100,1) for v in explained[:3]]}%")
 print("\n── 5. K-Means clustering (k=8) ───────────────────────────────")
 
 km     = KMeans(n_clusters=8, init="k-means++", n_init=10, random_state=42)
-labels = km.fit_predict(X_pca)
+labels = km.fit_predict(X_pca)       # 0-indexed internally
+labels_1 = labels + 1                # 1-indexed for all output (clusters 1–8)
 
-creatives_df["cluster"] = labels
-sizes = pd.Series(labels).value_counts().sort_index()
+creatives_df["cluster"] = labels_1
+sizes = pd.Series(labels_1).value_counts().sort_index()
 print(f"  Cluster sizes: {sizes.tolist()}")
 
 
@@ -325,9 +281,10 @@ def top_val(series):
 
 cluster_profiles: dict = {}
 for k in range(8):
-    sub = creatives_df[creatives_df["cluster"] == k]
+    k_key = str(k + 1)  # 1-indexed keys
+    sub = creatives_df[creatives_df["cluster"] == k + 1]
     if len(sub) == 0:
-        cluster_profiles[str(k)] = {}
+        cluster_profiles[k_key] = {}
         continue
 
     status_dist = {}
@@ -337,7 +294,7 @@ for k in range(8):
             for s, v in sub["performance_status"].value_counts(normalize=True).items()
         }
 
-    cluster_profiles[str(k)] = {
+    cluster_profiles[k_key] = {
         "size":       int(len(sub)),
         "avg_perf":   round(float(sub["perf_score"].mean()), 4) if "perf_score"    in sub.columns else 0,
         "avg_ctr":    round(float(sub["overall_ctr"].mean()), 6) if "overall_ctr"  in sub.columns else 0,
@@ -348,8 +305,8 @@ for k in range(8):
         "top_kpi":    top_val(sub["kpi_goal"]),
         "status_dist": status_dist,
     }
-    cp = cluster_profiles[str(k)]
-    print(f"  Cluster {k}: n={cp['size']:3d}  perf={cp['avg_perf']:.3f}"
+    cp = cluster_profiles[k_key]
+    print(f"  Cluster {k+1}: n={cp['size']:3d}  perf={cp['avg_perf']:.3f}"
           f"  {cp['top_format']}/{cp['top_theme']}/{cp['top_tone']}")
 
 
@@ -358,7 +315,7 @@ for k in range(8):
 # ═════════════════════════════════════════════════════════════════════
 creative_ml: dict = {
     cid: {
-        "cluster": int(labels[i]),
+        "cluster": int(labels[i]) + 1,   # 1-indexed (clusters 1–8)
         "pc":      [round(float(v), 4) for v in X_pca[i, :10]],
     }
     for i, cid in enumerate(valid_ids)
@@ -481,7 +438,70 @@ else:
 
 
 # ═════════════════════════════════════════════════════════════════════
-# 8d. EMBED MODEL PARAMETERS  (for JS new-creative predictor)
+# 8d. CLUSTER SHAP PROFILES  (what defines each cluster?)
+# ═════════════════════════════════════════════════════════════════════
+print("\n── 8d. Cluster SHAP profiles ─────────────────────────────────")
+
+# Train a multiclass RF classifier: predict cluster membership from features.
+# SHAP on this classifier tells us which features *define* each cluster —
+# i.e. which features most strongly push a creative into cluster k vs others.
+cluster_clf = RandomForestClassifier(
+    n_estimators=200, max_features="sqrt", random_state=42, n_jobs=-1
+)
+cluster_clf.fit(X, labels)   # 0-indexed labels internally
+
+cluster_shap_profiles: dict = {}
+
+if HAS_SHAP:
+    print("  Computing cluster SHAP values (RandomForestClassifier) …")
+    exp_clf = shap.TreeExplainer(cluster_clf)
+    shap_values_clf = exp_clf.shap_values(X)
+
+    # shap returns different shapes depending on version:
+    #   Old shap (<0.45 approx): list of n_classes arrays, each (n_samples, n_features)
+    #   New shap (>=0.45 approx): single ndarray of shape (n_samples, n_features, n_classes)
+    sv_raw = np.array(shap_values_clf)
+    if sv_raw.ndim == 3 and sv_raw.shape[0] == X.shape[0]:
+        # New format: (n_samples, n_features, n_classes)
+        get_class_sv = lambda k: sv_raw[:, :, k]
+    elif sv_raw.ndim == 3 and sv_raw.shape[2] == X.shape[0]:
+        # Transposed new format: (n_classes, n_features, n_samples)
+        get_class_sv = lambda k: sv_raw[k].T
+    else:
+        # Old format: (n_classes, n_samples, n_features) after np.array on list
+        get_class_sv = lambda k: sv_raw[k]
+
+    for k in range(8):
+        mask_k = labels == k
+        if mask_k.sum() == 0:
+            continue
+        sv_k = get_class_sv(k)            # (n_samples, n_features)
+        mean_sv = sv_k[mask_k].mean(axis=0)
+        pairs = sorted(zip(ALL_FEAT_NAMES, mean_sv),
+                       key=lambda x: abs(x[1]), reverse=True)[:10]
+        cluster_shap_profiles[str(k + 1)] = {
+            "top": [{"name": n, "shap": round(float(v), 5)} for n, v in pairs]
+        }
+    print(f"  Cluster SHAP done for {len(cluster_shap_profiles)} clusters")
+
+else:
+    # Fallback: use per-cluster mean feature values (standardised) as a proxy
+    print("  Using mean standardised feature values as cluster signature …")
+    for k in range(8):
+        mask_k = labels == k
+        if mask_k.sum() == 0:
+            continue
+        mean_x = X[mask_k].mean(axis=0)
+        pairs = sorted(zip(ALL_FEAT_NAMES, mean_x),
+                       key=lambda x: abs(x[1]), reverse=True)[:10]
+        cluster_shap_profiles[str(k + 1)] = {
+            "top": [{"name": n, "shap": round(float(v), 5)} for n, v in pairs]
+        }
+    print(f"  Fallback signatures done for {len(cluster_shap_profiles)} clusters")
+
+
+# ═════════════════════════════════════════════════════════════════════
+# 8e. EMBED MODEL PARAMETERS  (for JS new-creative predictor)
 # ═════════════════════════════════════════════════════════════════════
 print("\n── 8d. Embedding model parameters for JS predictor ──────────")
 
@@ -567,6 +587,7 @@ print(f"  {status_ctr_retention}")
 ml_results = {
     "feature_importance":     feature_importance,
     "cluster_profiles":       cluster_profiles,
+    "cluster_shap_profiles":  cluster_shap_profiles,
     "creative_ml":            creative_ml,
     "creative_shap":          creative_shap,
     "pca_explained_variance": [round(v, 4) for v in explained],
@@ -621,6 +642,7 @@ for cid, grp in daily_agg.groupby("creative_id"):
 KEEP = [
     "creative_id", "campaign_id", "advertiser_name", "app_name",
     "ad_format", "vertical", "theme", "tone", "os", "language",
+    "target_age_segment", "countries", "n_countries",
     "performance_status", "kpi_goal",
     "perf_score", "overall_ctr", "overall_cvr", "overall_roas", "overall_ipm",
     "ctr_decay_pct", "cvr_decay_pct", "fatigue_day", "total_days_active",
@@ -628,9 +650,11 @@ KEEP = [
     "first_7d_ctr", "last_7d_ctr",
     "text_density", "readability_score", "brand_visibility_score",
     "clutter_score", "novelty_score", "motion_score", "duration_sec",
-    "has_gameplay", "has_ugc_style", "has_price", "has_discount_badge",
+    "copy_length_chars", "product_count", "faces_count",
+    "has_gameplay", "has_ugc_style", "has_price", "has_discount_badge", "has_us",
     "dominant_color", "hook_type", "cta_text", "headline",
     "width", "height",
+    "cpa",
 ]
 KEEP = [c for c in KEEP if c in creatives_df.columns]
 

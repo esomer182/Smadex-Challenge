@@ -1,0 +1,25 @@
+- Estructurar millor les tabs en 3 grups:
+    1) Analytics
+        Tot menys portfolio optimizer and predict creative.
+    2) Creative Generation
+        portfolio optimizer i predict creative.
+    3) Help
+
+- Que el chatbot et faci el típic missatge de "hey, I'm Gemini, I'm here to help you" o algo així al principi.
+
+- Sobre generació, 
+    1) I del predict creative, que puguin deixar sense omplir alguns features i la IA suggereixi com omplir-los.
+    2) Add LLM explainability to the performance metrics.
+
+- Después del CPA incluye un $ inútil todo el rato.
+- Reorganitzar la layourt de portfolio optimizer i help, i a help sobretot condensar millor la informació,
+prioritzar-la millor, i organitzar-la millor.
+
+- Mirar bé com fa lo de la ortogonalitat.
+- Intentar entrenar una IA de Computer Vision per afegir features de les imatges com a tal (very low prio)
+
+- Reorganitzar help (medium-high prio).
+
+- De la pàgina de portfolio optimizer, moure un bloc de visualització a dalt.
+- Fins i tot quan prioritzes performance són com molt ortogonals, sus.
+

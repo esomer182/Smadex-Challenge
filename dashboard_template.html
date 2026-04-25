@@ -1,0 +1,2182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Smadex Creative Copilot</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;
+  --text:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--accent2:#3fb950;
+  --warn:#d29922;--danger:#f85149;--purple:#bc8cff;--orange:#ffa657;
+  --top:#ffd700;--stable:#58a6ff;--fatigued:#f85149;--under:#d29922;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 22px;display:flex;align-items:center;gap:14px}
+.logo{font-size:20px;font-weight:700;color:var(--accent)}.logo span{color:var(--text)}
+.tagline{color:var(--muted);font-size:11px}
+.kpib{margin-left:auto;display:flex;gap:24px}
+.kpip .val{font-size:19px;font-weight:700;color:var(--accent);text-align:center}
+.kpip .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center}
+nav{background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:stretch;padding:0 18px;overflow-x:auto;gap:0}
+nav button{background:none;border:none;color:var(--muted);padding:10px 14px;cursor:pointer;font-size:12px;border-bottom:2px solid transparent;transition:.15s;white-space:nowrap}
+nav button:hover{color:var(--text)}
+nav button.active{color:var(--accent);border-bottom-color:var(--accent)}
+.nav-group{display:flex;align-items:stretch;position:relative}
+.nav-group+.nav-group{border-left:1px solid var(--border);margin-left:4px;padding-left:4px}
+.nav-group-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;padding:4px 10px 0;opacity:.65;align-self:flex-start;padding-top:6px}
+.tab-content{display:none;padding:18px}
+.tab-content.active{display:block}
+.filters{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:16px;align-items:flex-end}
+.fg{display:flex;flex-direction:column;gap:3px}
+.fg label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+select,input{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;font-size:12px;outline:none}
+select:focus,input:focus{border-color:var(--accent)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px}
+.card h3{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:11px}
+.cw{position:relative;height:250px}.cw.tall{height:320px}.cw.sh{height:190px}
+/* Cards */
+.cg{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:11px}
+.cc{background:var(--surface);border:1px solid var(--border);border-radius:9px;overflow:hidden;cursor:pointer;transition:.15s}
+.cc:hover{border-color:var(--accent);transform:translateY(-1px)}
+.cc img{width:100%;height:105px;object-fit:cover;background:var(--surface2)}
+.cc .inf{padding:8px}
+.cc .cid{font-size:10px;color:var(--muted)}
+.cc .hl{font-size:12px;font-weight:600;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc .meta{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
+.badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:20px;text-transform:uppercase;white-space:nowrap}
+.badge.top_performer{background:#ffd70015;color:var(--top);border:1px solid #ffd70030}
+.badge.stable{background:#58a6ff15;color:var(--stable);border:1px solid #58a6ff30}
+.badge.fatigued{background:#f8514915;color:var(--fatigued);border:1px solid #f8514930}
+.badge.underperformer{background:#d2992215;color:var(--under);border:1px solid #d2992230}
+.kpi-badge{font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);color:var(--purple)}
+.score{font-size:12px;font-weight:700;color:var(--accent)}
+/* Pagination */
+.pagination{display:flex;justify-content:center;gap:3px;margin-top:12px;align-items:center;flex-wrap:wrap}
+.pb{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:11px;min-width:30px;text-align:center}
+.pb.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+.pb:hover:not(.active,.dots){border-color:var(--accent)}
+.pb.dots{cursor:default;opacity:.5}
+.pg-info{color:var(--muted);font-size:11px;margin-right:4px}
+/* Modal */
+.mo{position:fixed;inset:0;background:#000c;display:none;z-index:100;align-items:center;justify-content:center}
+.mo.open{display:flex}
+.md{background:var(--surface);border:1px solid var(--border);border-radius:13px;width:min(700px,96vw);max-height:92vh;overflow-y:auto;padding:20px}
+.mh{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.mc{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1}
+.md img{width:100%;max-height:190px;object-fit:contain;background:var(--surface2);border-radius:8px;margin-bottom:13px}
+.sr{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:13px}
+.sb{background:var(--surface2);border-radius:7px;padding:8px;text-align:center}
+.sb .v{font-size:16px;font-weight:700;color:var(--accent)}.sb .l{font-size:9px;color:var(--muted);text-transform:uppercase}
+.at-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.at{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:10px;color:var(--muted)}
+.at span{color:var(--text)}
+/* Table */
+.tw{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:var(--surface2);color:var(--muted);text-align:left;padding:8px 11px;font-size:10px;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+td{padding:7px 11px;border-top:1px solid var(--border);vertical-align:middle}
+tr:hover td{background:#ffffff05}
+.ac{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;white-space:nowrap}
+.ac.scale{background:#3fb95015;color:var(--accent2);border:1px solid #3fb95030}
+.ac.pause{background:#f8514915;color:var(--fatigued);border:1px solid #f8514930}
+.ac.monitor{background:#d2992215;color:var(--warn);border:1px solid #d2992230}
+/* Fatigue */
+.fs{background:var(--surface2);border-radius:7px;padding:9px;margin-bottom:7px}
+.fs .lbl{font-size:9px;color:var(--muted);text-transform:uppercase}
+.fs .val{font-size:18px;font-weight:700;margin-top:2px}
+.good{color:var(--accent2)}.bad{color:var(--fatigued)}
+/* Feature importance */
+.fi-bar{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.fi-lbl{width:160px;text-align:right;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fi-tr{flex:1;background:var(--surface2);border-radius:3px;height:19px;position:relative}
+.fi-fill{height:100%;border-radius:3px;transition:.4s}
+.fi-val{position:absolute;right:5px;top:50%;transform:translateY(-50%);font-size:9px;font-weight:600;color:var(--text)}
+/* Cluster cards */
+.cl-card{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:12px;cursor:pointer;transition:.15s}
+.cl-card:hover{border-color:var(--accent)}
+.cl-card.sel{border-color:var(--accent);background:var(--surface2)}
+/* Orthogonal */
+.ort-chip{background:var(--accent);color:#000;font-size:10px;font-weight:700;padding:3px 7px;border-radius:20px;cursor:pointer;display:inline-flex;align-items:center;gap:3px}
+.ort-chip::after{content:'×';font-size:13px;opacity:.7}
+.ort-item{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:9px;cursor:pointer}
+.ort-item:hover{border-color:var(--accent)}
+.ort-bar{height:3px;background:var(--border);border-radius:2px;margin-top:5px}
+.ort-fill{height:100%;border-radius:2px;background:var(--purple)}
+/* Sub-tabs */
+.stbar{display:flex;gap:5px;margin-bottom:13px;flex-wrap:wrap}
+.stbtn{background:none;border:1px solid var(--border);color:var(--muted);padding:5px 13px;border-radius:20px;cursor:pointer;font-size:11px;transition:.15s}
+.stbtn.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600}
+/* Fatigue note box */
+.note-box{background:var(--surface2);border-left:3px solid var(--accent);border-radius:0 7px 7px 0;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.6}
+.note-box strong{color:var(--text)}
+.chip{font-size:10px;padding:2px 7px;border-radius:20px;border:1px solid var(--border);color:var(--muted);background:var(--surface2);display:inline-block}
+.empty{color:var(--muted);text-align:center;padding:32px;font-size:13px}
+
+/* ── AI Explain ─────────────────────────────────────────────── */
+.explain-btn{background:linear-gradient(135deg,#58a6ff22,#bc8cff22);border:1px solid #bc8cff55;
+  color:var(--purple);padding:3px 9px;border-radius:5px;cursor:pointer;font-size:10px;
+  font-weight:600;transition:.15s;white-space:nowrap}
+.explain-btn:hover{background:linear-gradient(135deg,#58a6ff44,#bc8cff44);border-color:var(--purple)}
+.explain-box{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--purple);
+  border-radius:7px;padding:12px 14px;font-size:12px;line-height:1.7;color:var(--text);margin-top:10px}
+.explain-loading{color:var(--muted);font-size:11px;font-style:italic}
+/* ── API key is set at build time by build_dashboard.py ──────── */
+/* ── Strategy slider ─────────────────────────────────────────── */
+.strategy-track{display:flex;align-items:center;gap:10px;margin:10px 0}
+.strategy-track input[type=range]{flex:1;accent-color:var(--purple)}
+.strategy-label{font-size:11px;color:var(--purple);font-weight:700;min-width:150px;text-align:center}
+.kpi-checks{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.kpi-check-lbl{display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;
+  background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;
+  transition:.15s}
+.kpi-check-lbl:has(input:checked){border-color:var(--accent);background:var(--accent)22}
+/* ── Predict tab ─────────────────────────────────────────────── */
+.pred-form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:600px){.pred-form{grid-template-columns:1fr}}
+.pred-result{background:var(--surface2);border:1px solid var(--border);border-radius:10px;
+  padding:20px;text-align:center;margin-top:16px}
+.pred-score{font-size:48px;font-weight:800;color:var(--accent)}
+.pred-band{font-size:11px;color:var(--muted);margin-top:4px}
+.pred-badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+.pred-reasoning{font-size:12px;color:var(--muted);line-height:1.7;margin-top:12px;text-align:left}
+
+/* ── Help tab ────────────────────────────────────────────────── */
+.help-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.help-section{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px}
+.help-section h3{color:var(--accent);font-size:13px;margin-bottom:12px;display:flex;align-items:center;gap:7px}
+.metric-row{display:flex;flex-direction:column;gap:3px;padding:8px 0;border-bottom:1px solid var(--border)22}
+.metric-row:last-child{border-bottom:none}
+.metric-name{font-size:12px;font-weight:700;color:var(--text)}
+.metric-def{font-size:11px;color:var(--muted);line-height:1.6}
+.metric-range{font-size:10px;color:var(--purple);margin-top:2px}
+.status-pill{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;margin-right:4px}
+/* ── Chatbot ─────────────────────────────────────────────────── */
+.chat-fab{position:fixed;bottom:22px;right:22px;width:52px;height:52px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),var(--purple));border:none;
+  color:#fff;font-size:22px;cursor:pointer;box-shadow:0 4px 18px #0008;z-index:900;
+  display:flex;align-items:center;justify-content:center;transition:.2s}
+.chat-fab:hover{transform:scale(1.08)}
+.chat-panel{position:fixed;bottom:84px;right:22px;width:370px;max-height:560px;
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  box-shadow:0 8px 40px #0009;z-index:901;display:none;flex-direction:column;overflow:hidden}
+.chat-panel.open{display:flex}
+.chat-header{background:linear-gradient(135deg,#1c2333,#2a1f3d);padding:13px 16px;
+  display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)}
+.chat-header .dot{width:8px;height:8px;border-radius:50%;background:var(--accent2)}
+.chat-header span{font-size:13px;font-weight:700;color:var(--text)}
+.chat-header .sub{font-size:10px;color:var(--muted)}
+.chat-close{margin-left:auto;background:none;border:none;color:var(--muted);
+  cursor:pointer;font-size:16px;padding:2px 6px}
+.chat-messages{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;
+  min-height:200px;max-height:380px}
+.chat-msg{max-width:88%;padding:9px 12px;border-radius:10px;font-size:12px;line-height:1.6}
+.chat-msg.user{background:var(--accent)22;border:1px solid var(--accent)44;
+  align-self:flex-end;color:var(--text)}
+.chat-msg.assistant{background:var(--surface2);border:1px solid var(--border);
+  align-self:flex-start;color:var(--text)}
+.chat-msg.thinking{color:var(--muted);font-style:italic}
+.chat-input-row{display:flex;gap:8px;padding:10px;border-top:1px solid var(--border)}
+.chat-input-row input{flex:1;background:var(--surface2);border:1px solid var(--border);
+  border-radius:7px;color:var(--text);padding:8px 11px;font-size:12px}
+.chat-input-row input:focus{outline:none;border-color:var(--accent)}
+.chat-send{background:var(--accent);color:#000;border:none;border-radius:7px;
+  padding:8px 14px;font-weight:700;cursor:pointer;font-size:12px;white-space:nowrap}
+.chat-send:disabled{opacity:.4;cursor:not-allowed}
+.chat-suggestions{padding:8px 14px;display:flex;flex-wrap:wrap;gap:5px;border-top:1px solid var(--border)}
+.chat-sug{background:var(--surface2);border:1px solid var(--border);color:var(--muted);
+  border-radius:5px;padding:3px 9px;font-size:10px;cursor:pointer;transition:.15s}
+.chat-sug:hover{border-color:var(--accent);color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <div><div class="logo">Smadex <span>Creative Copilot</span></div>
+    <div class="tagline">pandas · PCA · K-Means++ · Random Forest · XGBoost · SHAP · Gemini AI</div></div>
+  <div class="kpib" id="gkpis"></div>
+</header>
+<nav>
+  <div class="nav-group">
+    <span class="nav-group-label">Analytics</span>
+    <button class="active" onclick="showTab('explorer',this)">🔍 Explorer</button>
+    <button onclick="showTab('fatigue',this)">📉 Fatigue</button>
+    <button onclick="showTab('reco',this)">🎯 Recommendations</button>
+    <button onclick="showTab('insights',this)">💡 ML Insights</button>
+    <button onclick="showTab('clusters',this)">🔵 Clusters</button>
+  </div>
+  <div class="nav-group">
+    <span class="nav-group-label">Creative Generation</span>
+    <button onclick="showTab('ortho',this)">🧮 Portfolio Optimizer</button>
+    <button onclick="showTab('predict',this)">🔮 Predict Creative</button>
+  </div>
+  <div class="nav-group">
+    <span class="nav-group-label">Help</span>
+    <button onclick="showTab('help',this)">📖 Help</button>
+  </div>
+</nav>
+
+<!-- ══ EXPLORER ══ -->
+<div id="tab-explorer" class="tab-content active">
+  <div class="filters">
+    <div class="fg"><label>Advertiser</label><select id="f-adv" onchange="renderExplorer()"><option value="">All</option></select></div>
+    <div class="fg"><label>Vertical</label><select id="f-vert" onchange="renderExplorer()"><option value="">All</option></select></div>
+    <div class="fg"><label>Format</label><select id="f-fmt" onchange="renderExplorer()"><option value="">All</option></select></div>
+    <div class="fg"><label>Status</label><select id="f-status" onchange="renderExplorer()">
+      <option value="">All</option><option>top_performer</option><option>stable</option><option>fatigued</option><option>underperformer</option></select></div>
+    <div class="fg"><label>KPI Goal</label><select id="f-kpi" onchange="renderExplorer()">
+      <option value="">All</option><option>CPA</option><option>ROAS</option><option>IPM</option><option>CTR</option></select></div>
+    <div class="fg"><label>Cluster</label><select id="f-cluster" onchange="renderExplorer()"><option value="">All</option></select></div>
+    <div class="fg"><label>Sort by</label><select id="f-sort" onchange="renderExplorer()">
+      <option value="perf_score">Perf Score</option><option value="overall_ctr">CTR</option>
+      <option value="overall_cvr">CVR</option><option value="overall_roas">ROAS</option>
+      <option value="overall_ipm">IPM</option><option value="total_spend_usd">Spend</option>
+      <option value="ctr_decay_pct">CTR Decay</option></select></div>
+    <div class="fg"><label>Search</label><input id="f-search" placeholder="Headline / ID…" oninput="renderExplorer()" style="width:140px"/></div>
+    <div class="fg"><label>View</label><select id="f-view" onchange="renderExplorer()"><option value="cards">Cards</option><option value="chart">Top 20 Chart</option></select></div>
+  </div>
+  <div class="g2" style="margin-bottom:14px">
+    <div class="card"><h3 id="dist-title">Perf Score Distribution</h3><div class="cw"><canvas id="ch-dist"></canvas></div></div>
+    <div class="card"><h3>CTR vs CVR by Status</h3><div class="cw"><canvas id="ch-scatter"></canvas></div></div>
+  </div>
+  <div id="exp-content"></div>
+  <div class="pagination" id="exp-pages"></div>
+</div>
+
+<!-- ══ FATIGUE ══ -->
+<div id="tab-fatigue" class="tab-content">
+  <div class="note-box">
+    <strong>📊 About CTR Decline in Digital Advertising</strong><br/>
+    CTR naturally decreases over time for <em>all</em> creatives — this is normal audience saturation and banner blindness. What distinguishes creatives is <em>how fast</em> and <em>how far</em> CTR drops.
+    The <strong>normalized view</strong> (% of launch-week baseline) makes this immediately comparable:
+    top performers retain <strong style="color:var(--top)">~33%</strong> of launch CTR,
+    stable creatives <strong style="color:var(--stable)">~23%</strong>, and
+    fatigued ones only <strong style="color:var(--fatigued)">~16%</strong>.
+  </div>
+  <div class="g2" style="margin-bottom:14px">
+    <div class="card"><h3>CTR Decay Severity — Top 15 Fatigued</h3><div class="cw"><canvas id="ch-fat-bar"></canvas></div></div>
+    <div class="card"><h3>Status Breakdown</h3><div class="cw"><canvas id="ch-status-pie"></canvas></div></div>
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <h3>Inspect Creative CTR Over Time</h3>
+    <div class="filters" style="margin-bottom:11px">
+      <div class="fg"><label>Advertiser</label><select id="fat-adv" onchange="popFatCreatives()"><option value="">All</option></select></div>
+      <div class="fg"><label>Status</label><select id="fat-status" onchange="popFatCreatives()">
+        <option value="">All</option><option>top_performer</option><option selected>fatigued</option><option>stable</option><option>underperformer</option></select></div>
+      <div class="fg"><label>Creative</label><select id="fat-cid" onchange="renderFatigueChart()" style="width:310px"></select></div>
+      <div class="fg"><label>View</label><select id="fat-view" onchange="renderFatigueChart()">
+        <option value="norm">Normalized (% of launch week)</option>
+        <option value="abs">Absolute CTR</option></select></div>
+    </div>
+    <div class="g2" style="align-items:start">
+      <div><div class="cw tall"><canvas id="ch-fat-line"></canvas></div></div>
+      <div id="fat-stats"></div>
+    </div>
+  </div>
+  <div class="card"><h3>Most Fatigued Creatives</h3><div class="tw" id="fat-table"></div></div>
+</div>
+
+<!-- ══ RECO ══ -->
+<div id="tab-reco" class="tab-content">
+  <div class="filters">
+    <div class="fg"><label>Advertiser</label><select id="r-adv" onchange="renderReco()"><option value="">All</option></select></div>
+    <div class="fg"><label>Vertical</label><select id="r-vert" onchange="renderReco()"><option value="">All</option></select></div>
+    <div class="fg"><label>KPI Goal</label><select id="r-kpi" onchange="renderReco()">
+      <option value="">All</option><option>CPA</option><option>ROAS</option><option>IPM</option><option>CTR</option></select></div>
+    <div class="fg"><label>Action</label><select id="r-action" onchange="renderReco()">
+      <option value="">All</option><option>scale</option><option>pause</option><option>monitor</option></select></div>
+  </div>
+  <div class="g3" style="margin-bottom:14px" id="reco-summary"></div>
+  <div class="card"><h3>Action Board — KPI-Aware</h3><div class="tw" id="reco-table"></div></div>
+</div>
+
+<!-- ══ ML INSIGHTS ══ -->
+<div id="tab-insights" class="tab-content">
+  <div class="stbar">
+    <button class="stbtn active" onclick="insTab('fi',this)">🌲 Feature Importance (RF)</button>
+    <button class="stbtn" onclick="insTab('patterns',this)">📊 Performance Patterns</button>
+    <button class="stbtn" onclick="insTab('dna',this)">🧬 Winning DNA</button>
+  </div>
+  <div id="ins-fi">
+    <div class="filters">
+      <div class="fg"><label>Target Metric</label><select id="fi-metric" onchange="renderFI()">
+        <option value="perf_score">Perf Score (all campaigns)</option>
+        <option value="ctr">CTR (all)</option><option value="cvr">CVR (all)</option><option value="roas">ROAS (all)</option>
+        <option value="kpi_CPA">CVR — CPA campaigns</option>
+        <option value="kpi_ROAS">ROAS — ROAS campaigns</option>
+        <option value="kpi_IPM">IPM — IPM campaigns</option>
+        <option value="kpi_CTR">CTR — CTR campaigns</option>
+      </select></div>
+    </div>
+    <div class="g2">
+      <div class="card"><h3>Feature Importance (Random Forest, 80 trees, variance-gain)</h3><div id="fi-bars"></div></div>
+      <div class="card"><h3>Interpretation</h3><div id="fi-explain" style="font-size:12px;line-height:1.7"></div></div>
+    </div>
+  </div>
+  <div id="ins-patterns" style="display:none">
+    <div class="filters">
+      <div class="fg"><label>Metric</label><select id="pat-metric" onchange="renderPatterns()">
+        <option value="perf_score">Perf Score</option><option value="overall_ctr">CTR</option>
+        <option value="overall_cvr">CVR</option><option value="overall_roas">ROAS</option><option value="overall_ipm">IPM</option></select></div>
+      <div class="fg"><label>KPI Filter</label><select id="pat-kpi" onchange="renderPatterns()">
+        <option value="">All</option><option>CPA</option><option>ROAS</option><option>IPM</option><option>CTR</option></select></div>
+      <div class="fg"><label>Vertical</label><select id="pat-vert" onchange="renderPatterns()"><option value="">All</option></select></div>
+    </div>
+    <div class="g2" style="margin-bottom:14px">
+      <div class="card"><h3>by Theme</h3><div class="cw tall"><canvas id="ch-theme"></canvas></div></div>
+      <div class="card"><h3>by Format</h3><div class="cw"><canvas id="ch-format"></canvas></div></div>
+    </div>
+    <div class="g2">
+      <div class="card"><h3>by Hook Type</h3><div class="cw tall"><canvas id="ch-hook"></canvas></div></div>
+      <div class="card"><h3>by Emotional Tone</h3><div class="cw"><canvas id="ch-tone"></canvas></div></div>
+    </div>
+  </div>
+  <div id="ins-dna" style="display:none">
+    <div class="filters">
+      <div class="fg"><label>Vertical</label><select id="dna-vert" onchange="renderDNA()"><option value="">All</option></select></div>
+      <div class="fg"><label>KPI Goal</label><select id="dna-kpi" onchange="renderDNA()">
+        <option value="">All</option><option>CPA</option><option>ROAS</option><option>IPM</option><option>CTR</option></select></div>
+    </div>
+    <div id="dna-content"></div>
+  </div>
+</div>
+
+<!-- ══ CLUSTERS ══ -->
+<div id="tab-clusters" class="tab-content">
+  <div class="g4" style="margin-bottom:14px" id="cluster-cards"></div>
+  <div class="card" style="margin-bottom:14px"><h3>Cluster Performance Comparison</h3><div class="cw"><canvas id="ch-cl-perf"></canvas></div></div>
+  <div class="g2" style="align-items:start;gap:14px;margin-bottom:14px">
+    <div class="card">
+      <h3>🤖 Cluster AI Explanation</h3>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.6">Select a cluster above, then ask Gemini to explain what makes it distinct using SHAP feature signals.</p>
+      <div style="margin-bottom:10px">
+        <select id="cl-explain-sel" style="width:180px;margin-right:8px"><option value="">Select cluster…</option></select>
+        <button class="explain-btn" onclick="explainCluster(document.getElementById('cl-explain-sel').value)">🤖 Explain This Cluster</button>
+      </div>
+      <div id="cl-explain-out"></div>
+    </div>
+    <div class="card">
+      <h3>Creatives in Cluster</h3>
+      <div style="margin-bottom:10px"><select id="cl-sel" onchange="renderClusterCreatives()" style="width:260px"><option value="">Select cluster…</option></select></div>
+      <div id="cl-creatives"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PORTFOLIO OPTIMIZER ══ -->
+<div id="tab-ortho" class="tab-content">
+  <!-- Top row: Build Portfolio + Coverage + Strategy -->
+  <div style="display:grid;grid-template-columns:1fr 200px 1fr;gap:14px;align-items:start;margin-bottom:14px">
+
+    <!-- Left: portfolio builder -->
+    <div class="card">
+      <h3>① Build Your Portfolio</h3>
+      <p style="color:var(--muted);font-size:11px;margin-bottom:10px;line-height:1.6">Add the creatives you're currently running. The optimizer ranks everything else by how much <em>new creative territory</em> it covers.</p>
+      <div class="fg" style="margin-bottom:8px">
+        <label>Search creative</label>
+        <input id="ort-q" placeholder="ID / headline / advertiser…" oninput="ortSearch()" style="width:100%"/>
+      </div>
+      <div id="ort-results" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:7px;margin-bottom:10px"></div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:5px">Current portfolio</div>
+      <div id="ort-portfolio" style="min-height:34px;border:1px solid var(--border);border-radius:7px;padding:7px;display:flex;flex-wrap:wrap;gap:5px;align-items:center">
+        <span style="color:var(--muted);font-size:11px">No creatives added yet…</span>
+      </div>
+      <button onclick="clearPortfolio()" style="margin-top:7px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:4px 11px;border-radius:5px;cursor:pointer;font-size:11px">Clear all</button>
+    </div>
+
+    <!-- Centre: coverage donut -->
+    <div class="card" style="text-align:center">
+      <h3>Cluster Coverage</h3>
+      <div class="cw sh" style="height:160px"><canvas id="ch-cov"></canvas></div>
+      <div id="cov-lbl" style="margin-top:6px;font-size:26px;font-weight:700;color:var(--purple)">—</div>
+      <div style="font-size:10px;color:var(--muted)">Creative archetypes covered</div>
+    </div>
+
+    <!-- Right: strategy controls -->
+    <div class="card">
+      <h3>② Strategy</h3>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.6">Balance <strong style="color:var(--accent)">performance</strong> vs. <strong style="color:var(--purple)">creative diversity</strong>.</p>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:3px">
+        <span>🎯 Best performers</span><span>🧮 Max diversity</span>
+      </div>
+      <div class="strategy-track">
+        <input type="range" id="ort-alpha" min="0" max="100" value="50" oninput="updateStrategyLabel();computeOrtho()"/>
+      </div>
+      <div class="strategy-label" id="ort-alpha-label">Balanced (50 % perf · 50 % ortho)</div>
+      <div style="margin-top:14px;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Target KPIs</div>
+      <div class="kpi-checks">
+        <label class="kpi-check-lbl"><input type="checkbox" class="ort-kpi-cb" value="CPA" onchange="computeOrtho()"> CPA</label>
+        <label class="kpi-check-lbl"><input type="checkbox" class="ort-kpi-cb" value="ROAS" onchange="computeOrtho()"> ROAS</label>
+        <label class="kpi-check-lbl"><input type="checkbox" class="ort-kpi-cb" value="IPM" onchange="computeOrtho()"> IPM</label>
+        <label class="kpi-check-lbl"><input type="checkbox" class="ort-kpi-cb" value="CTR" onchange="computeOrtho()"> CTR</label>
+      </div>
+      <div style="margin-top:14px">
+        <div class="fg"><label>Filter candidates by KPI</label><select id="ort-kpi" onchange="computeOrtho()">
+          <option value="">Any KPI</option><option>CPA</option><option>ROAS</option><option>IPM</option><option>CTR</option></select></div>
+        <div class="fg" style="margin-top:7px"><label>Require status</label><select id="ort-status" onchange="computeOrtho()">
+          <option value="">Any status</option><option>top_performer</option><option>stable</option></select></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom: recommendations full width -->
+  <div class="card">
+    <h3>③ Diversity Recommendations — ranked by how different they are from what you already run</h3>
+    <p style="color:var(--muted);font-size:11px;margin-bottom:11px;line-height:1.5">
+      Diversity score = how different a creative is from its closest portfolio neighbour (65% creative attributes + 35% visual profile). Each card shows which attributes differ most.
+    </p>
+    <div id="ort-recs" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:9px"></div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="mo" id="modal" onclick="if(event.target.id==='modal')closeModal()">
+  <div class="md">
+    <div class="mh">
+      <div><div style="font-size:16px;font-weight:700" id="m-title"></div>
+        <div style="color:var(--muted);font-size:11px;margin-top:1px" id="m-sub"></div></div>
+      <button class="mc" onclick="closeModal()">×</button>
+    </div>
+    <div id="m-img" style="width:100%;height:200px;border-radius:9px;margin-bottom:12px;overflow:hidden;background:var(--surface2)"></div>
+    <div class="sr" id="m-stats"></div>
+    <div style="margin-bottom:9px">
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Creative Attributes</div>
+      <div class="at-tags" id="m-attrs"></div>
+    </div>
+    <div style="background:var(--surface2);border-radius:7px;padding:11px;margin-bottom:10px">
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">AI Analysis</div>
+      <div id="m-analysis" style="font-size:12px;line-height:1.65;color:var(--text)"></div>
+    </div>
+    <div>
+      <button class="explain-btn" id="modal-explain-btn" onclick="explainCreative(+this.dataset.cid)" style="width:100%;justify-content:center">🤖 Deep AI Explain</button>
+      <div id="modal-explain" style="margin-top:8px"></div>
+    </div>
+  </div>
+</div>
+<div id="tab-predict" class="tab-content">
+  <div class="g2" style="align-items:start;gap:18px">
+    <div class="card">
+      <h3>🔮 Predict a New Creative</h3>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+        Configure a hypothetical creative and get an instant performance estimate based on patterns learnt from all 1 080 existing creatives. The model uses K-Means cluster matching + PCA feature profiles.
+      </p>
+      <div class="pred-form">
+        <div class="fg"><label>Ad Format <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <select id="pred-format"><option value="">✨ Auto – find best</option><option value="rewarded_video">Rewarded Video</option><option value="interstitial">Interstitial</option><option value="playable">Playable</option><option value="banner">Banner</option><option value="native">Native</option></select></div>
+        <div class="fg"><label>Vertical <span style="color:var(--danger);font-size:10px">required</span></label>
+          <select id="pred-vertical"><option value="gaming">Gaming</option><option value="ecommerce">E-commerce</option><option value="fintech">Fintech</option><option value="travel">Travel</option><option value="health">Health</option><option value="entertainment">Entertainment</option></select></div>
+        <div class="fg"><label>Theme <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <select id="pred-theme"><option value="">✨ Auto – find best</option><option value="gameplay">Gameplay</option><option value="product-focus">Product Focus</option><option value="discount">Discount</option><option value="testimonial">Testimonial</option><option value="feature-focus">Feature Focus</option><option value="ugc">UGC</option><option value="fantasy">Fantasy</option><option value="reward">Reward</option><option value="trust">Trust</option><option value="urgency">Urgency</option><option value="minimalist">Minimalist</option></select></div>
+        <div class="fg"><label>Tone <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <select id="pred-tone"><option value="">✨ Auto – find best</option><option value="excited">Excited</option><option value="playful">Playful</option><option value="urgent">Urgent</option><option value="trustworthy">Trustworthy</option><option value="premium">Premium</option><option value="calm">Calm</option><option value="adventurous">Adventurous</option></select></div>
+        <div class="fg"><label>OS Target <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <select id="pred-os"><option value="">✨ Auto – find best</option><option value="Both">Both (iOS + Android)</option><option value="iOS">iOS only</option><option value="Android">Android only</option></select></div>
+        <div class="fg"><label>KPI Goal <span style="color:var(--danger);font-size:10px">required</span></label>
+          <select id="pred-kpi"><option value="CPA">CPA (conversions)</option><option value="ROAS">ROAS (revenue)</option><option value="IPM">IPM (installs)</option><option value="CTR">CTR (clicks)</option></select></div>
+        <div class="fg"><label>Duration (seconds)</label>
+          <input type="number" id="pred-duration" value="30" min="5" max="120"/></div>
+        <div class="fg"><label>Text Density (0–1)</label>
+          <input type="number" id="pred-textdensity" value="0.4" min="0" max="1" step="0.05"/></div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin:14px 0">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="pred-gameplay"> Has gameplay footage</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="pred-ugc"> UGC-style content</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="pred-price"> Shows price</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="pred-badge"> Has discount badge</label>
+      </div>
+      <button onclick="predictNewCreative()" style="background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;width:100%">⚡ Predict Performance</button>
+      <div id="pred-result" style="margin-top:0"></div>
+    </div>
+    <div class="card">
+      <h3>How it works</h3>
+      <p style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:12px">
+        The predictor uses patterns from the full 1 080-creative dataset to estimate performance of an untested configuration.
+      </p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="background:var(--surface2);border-radius:8px;padding:11px 14px;font-size:11px">
+          <div style="font-weight:700;color:var(--accent);margin-bottom:4px">① Cluster matching</div>
+          Finds which of the 8 K-Means clusters your creative profile resembles most, based on format, vertical, theme and tone.
+        </div>
+        <div style="background:var(--surface2);border-radius:8px;padding:11px 14px;font-size:11px">
+          <div style="font-weight:700;color:var(--purple);margin-bottom:4px">② Feature adjustments</div>
+          Applies boosts and penalties from the Random Forest feature importance for your specific KPI goal.
+        </div>
+        <div style="background:var(--surface2);border-radius:8px;padding:11px 14px;font-size:11px">
+          <div style="font-weight:700;color:var(--accent2);margin-bottom:4px">③ Similar creatives</div>
+          Surfaces the top 3 existing creatives with the closest profile to benchmark your estimate.
+        </div>
+        <div style="background:var(--surface2);border-radius:8px;padding:11px 14px;font-size:11px">
+          <div style="font-weight:700;color:var(--warn);margin-bottom:4px">⚠ Limitations</div>
+          This is a heuristic estimate. Re-run <code>ml_pipeline_sklearn.py</code> locally to embed full PCA inference (sklearn model parameters) for higher accuracy.
+        </div>
+      </div>
+      <div style="margin-top:16px">
+        <h3 style="margin-bottom:10px">Top creatives in similar clusters</h3>
+        <div id="pred-similar" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<div id="tab-help" class="tab-content">
+  <div style="max-width:1060px;margin:0 auto">
+
+    <!-- Header -->
+    <div style="margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <h2 style="font-size:18px;color:var(--accent);margin-bottom:4px">📖 Help & Reference</h2>
+        <p style="font-size:11px;color:var(--muted)">Most common questions first. Use <strong>💬 Ask Gemini</strong> (bottom-right) for anything not listed here.</p>
+      </div>
+    </div>
+
+    <!-- ── QUICK ANSWERS ─────────────────────────────────────────── -->
+    <div class="help-section" style="margin-bottom:14px">
+      <h3>⚡ Frequent Questions</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px">
+
+        <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;border-left:3px solid var(--accent)">
+          <div style="font-weight:700;font-size:11px;margin-bottom:5px;color:var(--accent)">What status should I act on first?</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.6"><strong style="color:var(--danger)">fatigued</strong> — pause or refresh now. <strong style="color:#ffd700">top_performer</strong> — scale budget and create A/B variants. <strong style="color:var(--warn)">underperformer</strong> — reallocate budget. <strong style="color:var(--stable)">stable</strong> — monitor for early fatigue signals.</div>
+        </div>
+
+        <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;border-left:3px solid var(--accent)">
+          <div style="font-weight:700;font-size:11px;margin-bottom:5px;color:var(--accent)">What is a good CTR / ROAS / CPA?</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.6">
+            <strong>CTR</strong>: 0.8–2.5% typical, &gt;2% strong.<br>
+            <strong>ROAS</strong>: &gt;1.0 = profitable, &gt;2.0 = strong.<br>
+            <strong>CPA</strong>: dataset range $1.7–$35, median ~$13. Lower is better.<br>
+            <strong>IPM</strong>: 3–15 typical.
+          </div>
+        </div>
+
+        <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;border-left:3px solid var(--accent)">
+          <div style="font-weight:700;font-size:11px;margin-bottom:5px;color:var(--accent)">What drives performance most?</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.6"><strong>Ad format</strong> is the #1 driver across all KPI models. After that: <strong>novelty</strong>, <strong>vertical</strong>, <strong>motion</strong>, and <strong>has_gameplay</strong> (especially for CPA/IPM). Check the <strong>💡 ML Insights → Feature Importance</strong> tab for your specific KPI.</div>
+        </div>
+
+        <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;border-left:3px solid var(--purple)">
+          <div style="font-weight:700;font-size:11px;margin-bottom:5px;color:var(--purple)">How do I read the CTR decay chart?</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.6">Switch to <em>Normalized view</em> so all creatives start at 100%. Top performers keep ~33% of launch CTR; fatigued ads drop below ~16%. The benchmark lines make comparison fair regardless of how high the baseline CTR was.</div>
+        </div>
+
+        <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;border-left:3px solid var(--purple)">
+          <div style="font-weight:700;font-size:11px;margin-bottom:5px;color:var(--purple)">How does the Portfolio Optimizer work?</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.6">Add your currently running creatives (Step 1). The optimizer ranks everything else by <em>diversity score</em> — how different each creative is from its closest portfolio neighbour, based on creative attributes and visual profile. Slide the strategy bar toward Diversity to explore new archetypes, or toward Performance to favour proven winners.</div>
+        </div>
+
+        <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;border-left:3px solid var(--accent2)">
+          <div style="font-weight:700;font-size:11px;margin-bottom:5px;color:var(--accent2)">How do I use Predict Creative?</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.6">Set your target KPI, format, vertical, theme and tone, then click <strong>⚡ Predict</strong>. Use <strong>✨ AI Smart Fill</strong> first to get Gemini's suggestions on how to optimise the configuration for your KPI. The tool matches your spec to the nearest cluster and shows benchmark creatives.</div>
+        </div>
+
+        <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;border-left:3px solid var(--accent2)">
+          <div style="font-weight:700;font-size:11px;margin-bottom:5px;color:var(--accent2)">What does perf_score mean?</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.6">A 0–1 composite of CTR, CVR, ROAS, and IPM (all min-max normalised within the dataset). CTR carries the most weight (r=0.82 correlation). &gt;0.65 = top performer; &lt;0.35 = underperformer. It lets you rank creatives consistently regardless of KPI type.</div>
+        </div>
+
+        <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;border-left:3px solid var(--warn)">
+          <div style="font-weight:700;font-size:11px;margin-bottom:5px;color:var(--warn)">What are the clusters?</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.6">8 creative archetypes discovered by K-Means clustering on PCA-compressed features. Creatives in the same cluster share format, theme, tone and visual DNA. Click <strong>🔵 Explain This Cluster</strong> in the Clusters tab for a plain-English description of each archetype.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── METRICS AT A GLANCE ───────────────────────────────────── -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+
+      <div class="help-section">
+        <h3>📊 Performance Metrics</h3>
+        <div class="metric-row"><div class="metric-name">CTR — Click-Through Rate</div>
+          <div class="metric-def">Clicks ÷ Impressions. How often users tap the ad.</div>
+          <div class="metric-range">Typical 0.8–2.5% · Strong &gt;2%</div></div>
+        <div class="metric-row"><div class="metric-name">CVR — Conversion Rate</div>
+          <div class="metric-def">Conversions ÷ Clicks. Users who clicked and completed the goal action.</div>
+          <div class="metric-range">Typical 10–40%</div></div>
+        <div class="metric-row"><div class="metric-name">CPA — Cost per Acquisition</div>
+          <div class="metric-def">Spend ÷ Conversions. Lower is better.</div>
+          <div class="metric-range">Dataset $1.7–$35 · Median ~$13</div></div>
+        <div class="metric-row"><div class="metric-name">ROAS — Return on Ad Spend</div>
+          <div class="metric-def">Revenue ÷ Spend. &gt;1.0 = profitable.</div>
+          <div class="metric-range">&gt;2.0 = strong</div></div>
+        <div class="metric-row"><div class="metric-name">IPM — Installs per Mille</div>
+          <div class="metric-def">Conversions per 1,000 impressions.</div>
+          <div class="metric-range">Typical 3–15</div></div>
+        <div class="metric-row"><div class="metric-name">perf_score</div>
+          <div class="metric-def">Weighted 0–1 composite of CTR, CVR, ROAS, IPM.</div>
+          <div class="metric-range">&gt;0.65 top performer · &lt;0.35 underperformer</div></div>
+        <div class="metric-row"><div class="metric-name">ctr_decay_pct</div>
+          <div class="metric-def">(last_7d_ctr − first_7d_ctr) / first_7d_ctr. How much CTR dropped from launch. Always negative. −0.67 = 67% drop.</div></div>
+      </div>
+
+      <div class="help-section">
+        <h3>🏷️ Status Labels</h3>
+        <div class="metric-row">
+          <span class="status-pill" style="background:#ffd70022;color:#ffd700;border:1px solid #ffd70066">top_performer</span>
+          <div class="metric-def">perf_score &gt;0.65 and CTR holds well over time. <strong>→ Scale budget, create variants.</strong></div>
+        </div>
+        <div class="metric-row">
+          <span class="status-pill" style="background:var(--stable)22;color:var(--stable);border:1px solid var(--stable)66">stable</span>
+          <div class="metric-def">Solid, consistent, no strong fatigue. <strong>→ Monitor, consider iterating.</strong></div>
+        </div>
+        <div class="metric-row">
+          <span class="status-pill" style="background:var(--danger)22;color:var(--danger);border:1px solid var(--danger)66">fatigued</span>
+          <div class="metric-def">Clear decay past fatigue_day. Audiences overexposed. <strong>→ Pause or refresh. Do not scale.</strong></div>
+        </div>
+        <div class="metric-row">
+          <span class="status-pill" style="background:var(--warn)22;color:var(--warn);border:1px solid var(--warn)66">underperformer</span>
+          <div class="metric-def">Weak KPI from launch, perf_score &lt;0.35. <strong>→ Reallocate budget. Rethink concept.</strong></div>
+        </div>
+        <h3 style="margin-top:16px">✨ AI Features</h3>
+        <div class="metric-row"><div class="metric-name">🤖 Deep AI Explain (creative modal)</div>
+          <div class="metric-def">Click any creative → open modal → click <em>🤖 Deep AI Explain</em>. Gemini uses SHAP values to explain why this creative performs as it does.</div></div>
+        <div class="metric-row"><div class="metric-name">💡 Feature Importance Interpretation</div>
+          <div class="metric-def">ML Insights tab auto-generates a Gemini interpretation when you open it or switch the Target Metric. Cached per metric per session.</div></div>
+        <div class="metric-row"><div class="metric-name">📊 Metric Explain (modal stats)</div>
+          <div class="metric-def">In any creative modal, click CTR, KPI or ROAS to get a 2-sentence Gemini explanation of why that metric is what it is.</div></div>
+        <div class="metric-row"><div class="metric-name">✨ AI Smart Fill (Predict tab)</div>
+          <div class="metric-def">Click <em>✨ AI Smart Fill</em> on Predict Creative to get Gemini's top suggestions for optimising your creative spec for the chosen KPI.</div></div>
+        <div class="metric-row"><div class="metric-name">💬 Ask Gemini (chatbot)</div>
+          <div class="metric-def">Persistent chatbot with full dashboard context. Ask anything — metrics, strategy, how tabs work, dataset norms.</div></div>
+      </div>
+    </div>
+
+    <!-- ── CREATIVE ATTRIBUTES QUICK REF ─────────────────────────── -->
+    <div class="help-section" style="margin-bottom:14px">
+      <h3>🎨 Creative Attributes — Quick Reference</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;font-size:11px">
+        <div style="background:var(--surface2);border-radius:7px;padding:10px 12px"><strong>ad_format</strong> — rewarded_video, interstitial, playable, banner, native. #1 performance driver.</div>
+        <div style="background:var(--surface2);border-radius:7px;padding:10px 12px"><strong>novelty_score</strong> — visual originality vs. rest of dataset. High novelty fights banner blindness.</div>
+        <div style="background:var(--surface2);border-radius:7px;padding:10px 12px"><strong>motion_score</strong> — animation intensity. Strong signal for IPM and CPA in video formats.</div>
+        <div style="background:var(--surface2);border-radius:7px;padding:10px 12px"><strong>has_gameplay</strong> — shows actual gameplay footage. Top CVR predictor for CPA/IPM campaigns.</div>
+        <div style="background:var(--surface2);border-radius:7px;padding:10px 12px"><strong>has_ugc_style</strong> — creator/selfie format. Boosts perceived authenticity, lifts CTR.</div>
+        <div style="background:var(--surface2);border-radius:7px;padding:10px 12px"><strong>clutter_score</strong> — visual busyness. High clutter is negatively correlated with ROAS.</div>
+        <div style="background:var(--surface2);border-radius:7px;padding:10px 12px"><strong>text_density</strong> — fraction of frame covered by text. 0 = image-dominant, 1 = text-heavy.</div>
+        <div style="background:var(--surface2);border-radius:7px;padding:10px 12px"><strong>theme</strong> — gameplay, discount, testimonial, UGC, feature-focus, urgency, minimalist, etc.</div>
+        <div style="background:var(--surface2);border-radius:7px;padding:10px 12px"><strong>tone</strong> — excited, playful, urgent, trustworthy, premium, calm, adventurous.</div>
+        <div style="background:var(--surface2);border-radius:7px;padding:10px 12px"><strong>hook_type</strong> — opening technique: challenge, last-minute deal, story, before/after, cashback, etc.</div>
+        <div style="background:var(--surface2);border-radius:7px;padding:10px 12px"><strong>has_discount_badge</strong> — sale/bonus badge visible. Creates urgency. Paired with has_price for purchase intent.</div>
+        <div style="background:var(--surface2);border-radius:7px;padding:10px 12px"><strong>duration_sec</strong> — video length in seconds. Static = 0. Optimal length varies by format and vertical.</div>
+      </div>
+    </div>
+
+    <!-- ── ML CONCEPTS + DATA PIPELINE ──────────────────────────── -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="help-section">
+        <h3>🤖 How the ML Works</h3>
+        <div class="metric-row"><div class="metric-name">Feature set (no data leakage)</div>
+          <div class="metric-def">24 features: 11 visual/structural scores + 8 categorical attributes + 5 binary flags. Outcome metrics are never used as inputs — only as targets.</div></div>
+        <div class="metric-row"><div class="metric-name">Random Forest + SHAP</div>
+          <div class="metric-def">80 trees trained on all creatives. Feature importance = average error-reduction per split, normalised to 100%. SHAP values show each feature's exact contribution to a specific creative's predicted score.</div></div>
+        <div class="metric-row"><div class="metric-name">XGBoost (KPI models)</div>
+          <div class="metric-def">Gradient-boosted trees trained separately for CPA, ROAS, IPM, CTR campaigns. Often more accurate than the global RF for a specific campaign goal.</div></div>
+        <div class="metric-row"><div class="metric-name">PCA + K-Means clusters</div>
+          <div class="metric-def">PCA compresses features into 15 orthogonal components. K-Means finds 8 creative archetypes (C1–C8) based on feature-space proximity. Clusters are used by the Portfolio Optimizer and Predict Creative.</div></div>
+        <div class="metric-row"><div class="metric-name">R² (cross-validation)</div>
+          <div class="metric-def">How well the model predicts unseen creatives. &gt;0.5 is good for noisy creative data. Shown in ML Insights → CV Results.</div></div>
+        <div class="metric-row"><div class="metric-name">Orthogonality score</div>
+          <div class="metric-def">How different a creative is from its closest portfolio neighbour, measured as a weighted blend of categorical attributes (format, vertical, theme, tone, KPI, OS — 65%) and PCA visual profile in 6D (35%). 100% = completely unlike anything you're running; 0% = a clone.</div></div>
+      </div>
+
+      <div class="help-section">
+        <h3>⚙️ Data Pipeline</h3>
+        <div style="font-size:11px;color:var(--muted);line-height:1.8;margin-bottom:10px">Six source CSVs → two Python scripts → self-contained HTML dashboard.</div>
+        <div class="metric-row"><div class="metric-name">ml_pipeline_sklearn.py</div>
+          <div class="metric-def">Joins CSVs → builds 24-feature matrix → PCA → K-Means → RF + XGBoost → SHAP → writes <code>app_data.js</code> + <code>ml_results.json</code>. Re-run after any data update.</div></div>
+        <div class="metric-row"><div class="metric-name">build_dashboard.py</div>
+          <div class="metric-def">Injects <code>app_data.js</code> and <code>ml_results.json</code> into the template and adds your Gemini API key from <code>.env</code>. Outputs <code>creative_copilot.html</code>.</div></div>
+        <div class="metric-row"><div class="metric-name">API key setup</div>
+          <div class="metric-def">Copy <code>.env.example</code> → <code>.env</code>, paste your Gemini key, run <code>build_dashboard.py</code>. The key is never committed to git.</div></div>
+        <div class="metric-row"><div class="metric-name">Source files</div>
+          <div class="metric-def"><code>creatives.csv</code> · <code>campaigns.csv</code> · <code>creative_summary.csv</code> · <code>creative_daily_country_os_stats.csv</code> · <code>campaign_summary.csv</code> · <code>advertisers.csv</code></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+
+<script>/** DATA **/</script>
+<script>/** ML **/</script>
+<script>
+'use strict';
+
+// ── API key is set at build time by build_dashboard.py from .env ──
+const _apiKey = '%%GEMINI_KEY%%';
+
+// Convert basic markdown to safe HTML
+function markdownToHtml(text){
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/\n{2,}/g,'</p><p style="margin-top:8px">')
+    .replace(/\n/g,'<br>');
+}
+
+const _GEMINI_CANDIDATES = [
+  'gemini-2.5-flash','gemini-2.5-flash-lite','gemini-2.0-flash',
+  'gemini-2.0-flash-exp','gemini-1.5-flash','gemini-1.5-flash-8b',
+];
+let _GEMINI_MODEL = null;
+
+function _geminiURL(model){
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${_apiKey}`;
+}
+
+async function _resolveModel(){
+  if(_GEMINI_MODEL) return _GEMINI_MODEL;
+  for(const model of _GEMINI_CANDIDATES){
+    try{
+      const r=await fetch(_geminiURL(model),{method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({contents:[{role:'user',parts:[{text:'hi'}]}],generationConfig:{maxOutputTokens:4}})});
+      const d=await r.json();
+      if(!d.error){_GEMINI_MODEL=model;console.log('Gemini model:',model);return model;}
+    }catch(e){}
+  }
+  throw new Error('No Gemini model available. Check https://aistudio.google.com for available models.');
+}
+
+async function callGemini(systemPrompt,messages,maxTokens){
+  const model=await _resolveModel();
+  const contents=messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
+  const body={system_instruction:{parts:[{text:systemPrompt}]},contents,generationConfig:{maxOutputTokens:maxTokens}};
+  const resp=await fetch(_geminiURL(model),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const data=await resp.json();
+  if(data.error) throw new Error(data.error.message);
+  return data.candidates?.[0]?.content?.parts?.[0]?.text||'No response returned.';
+}
+
+const _fiCache={};
+const _clusterExplainCache={};
+
+
+const C=APP_DATA.creatives, TS=APP_DATA.ts, CMAP={};
+C.forEach(c=>CMAP[c.creative_id]=c);
+const SC={top_performer:'#ffd700',stable:'#58a6ff',fatigued:'#f85149',underperformer:'#d29922'};
+const KPI_METRIC={CPA:'cpa',ROAS:'overall_roas',IPM:'overall_ipm',CTR:'overall_ctr'};
+const KPI_LABEL={CPA:'CPA',ROAS:'ROAS',IPM:'IPM',CTR:'CTR'};
+const KPI_LOW={CPA:true}; // lower is better
+const CD={responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{labels:{color:'#8b949e',font:{size:10}}},tooltip:{bodyFont:{size:11}}},
+  scales:{x:{ticks:{color:'#8b949e',font:{size:10}},grid:{color:'#21262d'}},
+          y:{ticks:{color:'#8b949e',font:{size:10}},grid:{color:'#21262d'}}}};
+let expPage=0; const PS=24;
+let charts={};
+function dk(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+function mc(id,cfg){dk(id);charts[id]=new Chart(document.getElementById(id),cfg);return charts[id];}
+function sf(v,d=2){return v==null?'—':(+v).toFixed(d);}
+function pct(v,d=2){return v==null?'—':(v*100).toFixed(d)+'%';}
+// Format a KPI value according to its type
+function kpiFmt(kpi,v){
+  if(v==null||isNaN(+v))return '—';
+  if(kpi==='CPA') return '$'+(+v).toFixed(2);
+  if(kpi==='ROAS') return (+(v)).toFixed(2)+'x';
+  if(kpi==='IPM')  return (+(v)).toFixed(1);
+  return pct(v,2); // CTR
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+function init(){
+  const tot=C.length,top=C.filter(c=>c.performance_status==='top_performer').length,
+        fat=C.filter(c=>c.performance_status==='fatigued').length,
+        avgCTR=(C.reduce((s,c)=>s+(c.overall_ctr||0),0)/tot*100).toFixed(2);
+  document.getElementById('gkpis').innerHTML=`
+    <div class="kpip"><div class="val">${tot}</div><div class="lbl">Creatives</div></div>
+    <div class="kpip"><div class="val" style="color:var(--top)">${top}</div><div class="lbl">Top Performers</div></div>
+    <div class="kpip"><div class="val" style="color:var(--fatigued)">${fat}</div><div class="lbl">Fatigued</div></div>
+    <div class="kpip"><div class="val">${avgCTR}%</div><div class="lbl">Avg CTR</div></div>`;
+  const advs=[...new Set(C.map(c=>c.advertiser_name))].sort();
+  const verts=[...new Set(C.map(c=>c.vertical))].sort();
+  const fmts=[...new Set(C.map(c=>c.ad_format))].sort();
+  ['f-adv','fat-adv','r-adv'].forEach(id=>{
+    const s=document.getElementById(id); advs.forEach(a=>s.insertAdjacentHTML('beforeend',`<option>${a}</option>`));});
+  ['f-vert','r-vert','pat-vert','dna-vert'].forEach(id=>{
+    const s=document.getElementById(id); verts.forEach(v=>s.insertAdjacentHTML('beforeend',`<option>${v}</option>`));});
+  fmts.forEach(f=>document.getElementById('f-fmt').insertAdjacentHTML('beforeend',`<option>${f}</option>`));
+  for(let k=1;k<=8;k++){
+    const p=ML.cluster_profiles[k];
+    if(!p) continue;
+    [`f-cluster`,`cl-sel`,`cl-explain-sel`].forEach(id=>document.getElementById(id).insertAdjacentHTML('beforeend',
+      `<option value="${k}">C${k}: ${p.top_format}/${p.top_theme} (n=${p.size}, perf ${(p.avg_perf*100).toFixed(0)})</option>`));
+  }
+  renderExplorer(); renderFatigue(); renderClusters();
+  // renderReco and renderFI are deferred — called when their tabs are first opened
+  // so Chart.js renders into a visible element, not a display:none container
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function showTab(t,btn){
+  document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(e=>e.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active'); btn.classList.add('active');
+  if(t==='clusters') renderClusterPerf();
+  if(t==='ortho')    computeOrtho();
+  if(t==='reco')     renderReco();
+  if(t==='insights') renderFI();
+  if(t==='fatigue')  renderFatigue();
+}
+
+// ── EXPLORER ──────────────────────────────────────────────────────────────────
+function getFil(){
+  const adv=document.getElementById('f-adv').value, vert=document.getElementById('f-vert').value,
+    fmt=document.getElementById('f-fmt').value, status=document.getElementById('f-status').value,
+    kpi=document.getElementById('f-kpi').value, cluster=document.getElementById('f-cluster').value,
+    sort=document.getElementById('f-sort').value, q=document.getElementById('f-search').value.toLowerCase();
+  let data=C.filter(c=>{
+    if(adv&&c.advertiser_name!==adv)return false;
+    if(vert&&c.vertical!==vert)return false;
+    if(fmt&&c.ad_format!==fmt)return false;
+    if(status&&c.performance_status!==status)return false;
+    if(kpi&&c.kpi_goal!==kpi)return false;
+    if(cluster!==''&&String((ML.creative_ml[c.creative_id]||{}).cluster)!==cluster)return false;
+    if(q&&!c.headline?.toLowerCase().includes(q)&&!String(c.creative_id).includes(q))return false;
+    return true;
+  });
+  data.sort((a,b)=>sort==='ctr_decay_pct'?(a[sort]||0)-(b[sort]||0):(b[sort]||0)-(a[sort]||0));
+  return data;
+}
+function renderExplorer(){expPage=0;const d=getFil();renderDist(d);renderScatter(d);renderExpContent(d);}
+function renderExpContent(data){
+  const view=document.getElementById('f-view').value;
+  const page=data.slice(expPage*PS,(expPage+1)*PS);
+  const el=document.getElementById('exp-content');
+  if(view==='chart'){
+    const top20=data.slice(0,20),sort=document.getElementById('f-sort').value;
+    el.innerHTML=`<div class="card"><h3>Top 20 by ${sort}</h3><div class="cw tall"><canvas id="ch-top20"></canvas></div></div>`;
+    mc('ch-top20',{type:'bar',data:{labels:top20.map(c=>`#${c.creative_id}`),
+      datasets:[{data:top20.map(c=>+(c[sort]||0).toFixed(5)),
+        backgroundColor:top20.map(c=>SC[c.performance_status]+'99'),borderColor:top20.map(c=>SC[c.performance_status]),borderWidth:1,borderRadius:4}]},
+      options:{...CD,plugins:{...CD.plugins,legend:{display:false}}}}); 
+    document.getElementById('exp-pages').innerHTML=''; return;
+  }
+  if(!page.length){el.innerHTML='<div class="empty">No creatives match filters.</div>';return;}
+  el.innerHTML=`<div class="cg">${page.map(cCard).join('')}</div>`; renderPager(data.length);
+}
+function cCard(c){
+  const cml=ML.creative_ml[c.creative_id]||{}, score=((c.perf_score||0)*100).toFixed(0);
+  const kpiBadge=c.kpi_goal?`<span class="kpi-badge">${c.kpi_goal}</span>`:'';
+  const kpiVal=c.kpi_goal&&KPI_METRIC[c.kpi_goal]?kpiFmt(c.kpi_goal,c[KPI_METRIC[c.kpi_goal]])+' '+KPI_LABEL[c.kpi_goal]:'';
+  return `<div class="cc">
+    <img src="${c.asset_file||''}" loading="lazy" onerror="this.style.display='none'" onclick="openModal(${c.creative_id})" style="cursor:pointer"/>
+    <div class="inf">
+      <div class="cid">#${c.creative_id} · ${c.ad_format} · C${cml.cluster??'?'}</div>
+      <div class="hl" onclick="openModal(${c.creative_id})" style="cursor:pointer">${c.headline||'—'}</div>
+      <div class="meta"><span class="badge ${c.performance_status}">${(c.performance_status||'').replace('_',' ')}</span><span class="score">${score}pts</span></div>
+      <div style="margin-top:4px;font-size:10px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        ${kpiBadge}
+        <span>CTR <b style="color:var(--text)">${pct(c.overall_ctr,2)}</b></span>
+        <span>${kpiVal}</span>
+      </div>
+    </div></div>`;
+}
+function renderPager(total){
+  const pages=Math.ceil(total/PS), p=expPage, el=document.getElementById('exp-pages');
+  if(pages<=1){el.innerHTML='';return;}
+  const show=[]; const add=i=>{if(i>=0&&i<pages&&!show.includes(i))show.push(i);};
+  add(0);add(pages-1); for(let i=p-1;i<=p+1;i++)add(i); show.sort((a,b)=>a-b);
+  let html=`<span class="pg-info">${total} creatives</span>`;
+  html+=`<button class="pb" onclick="goPage(${Math.max(0,p-1)})"${p===0?' disabled':''}>‹</button>`;
+  let prev=-1; show.forEach(i=>{
+    if(prev!==-1&&i>prev+1)html+=`<span class="pb dots">…</span>`;
+    html+=`<button class="pb${i===p?' active':''}" onclick="goPage(${i})">${i+1}</button>`;
+    prev=i;});
+  html+=`<button class="pb" onclick="goPage(${Math.min(pages-1,p+1)})"${p===pages-1?' disabled':''}>›</button>`;
+  el.innerHTML=html;
+}
+function goPage(p){expPage=p;const d=getFil();renderExpContent(d);}
+function renderDist(data){
+  const sort=document.getElementById('f-sort').value;
+  const SORT_META={
+    perf_score:   {label:'Perf Score',     fmt:v=>(v*100).toFixed(0),   suffix:''},
+    overall_ctr:  {label:'CTR',            fmt:v=>(v*100).toFixed(2),   suffix:'%'},
+    overall_cvr:  {label:'CVR',            fmt:v=>(v*100).toFixed(2),   suffix:'%'},
+    overall_roas: {label:'ROAS',           fmt:v=>v.toFixed(2),         suffix:'x'},
+    overall_ipm:  {label:'IPM',            fmt:v=>v.toFixed(1),         suffix:''},
+    total_spend_usd:{label:'Spend',        fmt:v=>'$'+Math.round(v),    suffix:''},
+    ctr_decay_pct:{label:'CTR Decay',      fmt:v=>(v*100).toFixed(1),   suffix:'%'},
+  };
+  const meta=SORT_META[sort]||{label:sort,fmt:v=>v.toFixed(2),suffix:''};
+  document.getElementById('dist-title').textContent=meta.label+' Distribution';
+
+  const vals=data.map(c=>c[sort]??null).filter(v=>v!==null&&isFinite(v));
+  if(!vals.length){mc('ch-dist',{type:'bar',data:{labels:[],datasets:[{data:[]}]},options:{...CD}});return;}
+  let mn=Math.min(...vals), mx=Math.max(...vals);
+  if(mn===mx){mn=mn-0.001;mx=mx+0.001;}
+  const step=(mx-mn)/10;
+  const bins=Array(10).fill(0);
+  vals.forEach(v=>{const b=Math.min(9,Math.floor((v-mn)/step));bins[b]++;});
+  const labels=Array.from({length:10},(_,i)=>meta.fmt(mn+i*step)+meta.suffix);
+  mc('ch-dist',{type:'bar',data:{labels,datasets:[{data:bins,backgroundColor:'#58a6ff60',borderColor:'#58a6ff',borderWidth:1,borderRadius:4,label:'Creatives'}]},
+    options:{...CD,plugins:{...CD.plugins,legend:{display:false}},
+      scales:{...CD.scales,x:{...CD.scales.x,ticks:{...CD.scales.x.ticks,maxRotation:45,minRotation:30}}}}});
+}
+function renderScatter(data){
+  const bs={top_performer:[],stable:[],fatigued:[],underperformer:[]};
+  data.forEach(c=>{if(bs[c.performance_status])bs[c.performance_status].push({x:+(c.overall_ctr*100).toFixed(3),y:+(c.overall_cvr*100).toFixed(2)});});
+  mc('ch-scatter',{type:'scatter',data:{datasets:Object.entries(bs).map(([s,pts])=>({
+    label:s.replace('_',' '),data:pts,backgroundColor:SC[s]+'70',borderColor:SC[s],pointRadius:3}))},
+    options:{...CD,scales:{x:{...CD.scales.x,title:{display:true,text:'CTR (%)',color:'#8b949e'}},
+      y:{...CD.scales.y,title:{display:true,text:'CVR (%)',color:'#8b949e'}}}}});
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+function openModal(cid){
+  const c=CMAP[cid]; if(!c)return;
+  const cml=ML.creative_ml[c.creative_id]||{};
+  document.getElementById('m-title').textContent=c.headline||`Creative #${cid}`;
+  document.getElementById('m-sub').textContent=`${c.advertiser_name} · ${c.app_name} · ${c.ad_format} · KPI: ${c.kpi_goal||'?'} · Cluster C${cml.cluster??'?'}`;
+  document.getElementById('m-img').innerHTML=generateCreativePreview(c);
+  const kpiM=KPI_METRIC[c.kpi_goal], kpiL=KPI_LABEL[c.kpi_goal]||'KPI';
+  document.getElementById('m-stats').innerHTML=`
+    <div class="sb" title="Click to explain" onclick="explainMetricInContext(${cid},'overall_ctr')" style="cursor:pointer">
+      <div class="v">${pct(c.overall_ctr)}</div><div class="l">CTR <span style="font-size:9px;opacity:.6">💡</span></div>
+      <div id="metric-explain-overall_ctr" style="display:none;font-size:10px;color:var(--muted);margin-top:4px;text-align:left;line-height:1.5;max-width:120px"></div>
+    </div>
+    <div class="sb" title="Click to explain" onclick="explainMetricInContext(${cid},'${kpiM||'overall_ctr'}')" style="cursor:pointer">
+      <div class="v">${kpiM?kpiFmt(c.kpi_goal,c[kpiM]):'—'}</div><div class="l">${kpiL} <span style="font-size:9px;opacity:.6">💡</span></div>
+      <div id="metric-explain-${kpiM||'overall_ctr'}" style="display:none;font-size:10px;color:var(--muted);margin-top:4px;text-align:left;line-height:1.5;max-width:120px"></div>
+    </div>
+    <div class="sb" title="Click to explain" onclick="explainMetricInContext(${cid},'overall_roas')" style="cursor:pointer">
+      <div class="v">${sf(c.overall_roas,2)}x</div><div class="l">ROAS <span style="font-size:9px;opacity:.6">💡</span></div>
+      <div id="metric-explain-overall_roas" style="display:none;font-size:10px;color:var(--muted);margin-top:4px;text-align:left;line-height:1.5;max-width:120px"></div>
+    </div>
+    <div class="sb"><div class="v">${((c.perf_score||0)*100).toFixed(0)}</div><div class="l">Score</div></div>
+    <div class="sb"><div class="v">C${cml.cluster??'?'}</div><div class="l">Cluster</div></div>`;
+  document.getElementById('m-attrs').innerHTML=[
+    ['Theme',c.theme],['Hook',c.hook_type],['Tone',c.tone],['Color',c.dominant_color],
+    ['CTA',c.cta_text],['Lang',c.language],['Duration',c.duration_sec>0?c.duration_sec+'s':'Static'],
+    ['Age target',c.target_age_segment||'—'],['Countries',c.countries||'—'],['# Markets',c.n_countries??'—'],
+    ['Novelty',pct(c.novelty_score,0)],['Motion',pct(c.motion_score,0)],['Brand',pct(c.brand_visibility_score,0)],
+    ['Clutter',pct(c.clutter_score,0)],['Copy len',c.copy_length_chars??'—'],
+    ['Products',c.product_count??'—'],['Faces',c.faces_count??'—'],
+    ['Has Price',c.has_price?'✓':'✗'],['Discount',c.has_discount_badge?'✓':'✗'],
+    ['Gameplay',c.has_gameplay?'✓':'✗'],['UGC',c.has_ugc_style?'✓':'✗'],['US market',c.has_us?'✓':'✗'],
+  ].map(([l,v])=>`<span class="at">${l}: <span>${v}</span></span>`).join('');
+  document.getElementById('m-analysis').innerHTML=genAnalysis(c,cml);
+  // Reset explain button and output for this creative
+  const mBtn=document.getElementById('modal-explain-btn');
+  const mExpl=document.getElementById('modal-explain');
+  mBtn.dataset.cid=cid; mBtn.textContent='🤖 Deep AI Explain'; mBtn.disabled=false;
+  mExpl.innerHTML='';
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal(){document.getElementById('modal').classList.remove('open');}
+function genAnalysis(c,cml){
+  const lines=[], st=c.performance_status, kpi=c.kpi_goal, decay=c.ctr_decay_pct||0;
+  if(st==='top_performer') lines.push(`✅ <b>Top performer.</b> ${kpi} KPI: ${kpi&&KPI_METRIC[kpi]?kpiFmt(kpi,c[KPI_METRIC[kpi]])+' '+KPI_LABEL[kpi]:''}. Retains ~${Math.abs(1-(c.last_7d_ctr/(c.first_7d_ctr||1e-6))).toFixed(0)*100 < 70?'above-average':''}CTR over time. Scale budget and create A/B variants.`);
+  else if(st==='fatigued') lines.push(`🔴 <b>Fatigued</b> on day ${c.fatigue_day||'?'}. CTR dropped ${Math.abs(decay*100).toFixed(0)}% from launch — below the threshold for ${kpi} campaigns. Pause or refresh.`);
+  else if(st==='underperformer') lines.push(`⚠️ <b>Underperformer.</b> Primary ${kpi} metric is weak. Reallocate budget.`);
+  else lines.push(`🔵 <b>Stable.</b> CTR naturally declining (normal) but within healthy range for ${kpi}. Monitor for early fatigue.`);
+  if(kpi){
+    const topFeats=(ML.feature_importance[`kpi_${kpi}`]||ML.feature_importance['perf_score']||[]).slice(0,3).map(f=>f.name.replace(/_enc$/,'').replace(/_/g,' '));
+    lines.push(`📌 <b>${kpi} campaigns:</b> RF model says top drivers are <em>${topFeats.join(', ')}</em>.`);
+  }
+  if(c.has_gameplay) lines.push(`🎮 Gameplay visible — top predictor of CVR in CPA campaigns.`);
+  if(c.motion_score>0.6) lines.push(`⚡ High motion (${pct(c.motion_score,0)}) — strong signal for IPM and CPA.`);
+  if(c.novelty_score>0.7) lines.push(`🌟 High novelty (${pct(c.novelty_score,0)}) — fresh concept helps avoid banner blindness.`);
+  if(c.clutter_score>0.6) lines.push(`⚠️ High clutter (${pct(c.clutter_score,0)}) — negatively associated with ROAS.`);
+  if(c.has_ugc_style) lines.push(`📱 UGC-style format — builds authenticity and trust.`);
+  if(cml.cluster!=null){const cp=ML.cluster_profiles[cml.cluster];
+    lines.push(`🔵 Cluster C${cml.cluster} (${cp.size} creatives, avg perf ${(cp.avg_perf*100).toFixed(0)}/100): ${cp.top_format} / ${cp.top_theme} / ${cp.top_tone}.`);}
+  return lines.join('<br/><br/>');
+}
+
+// ── FATIGUE ───────────────────────────────────────────────────────────────────
+function renderFatigue(){
+  const counts={top_performer:0,stable:0,fatigued:0,underperformer:0};
+  C.forEach(c=>counts[c.performance_status]++);
+  mc('ch-status-pie',{type:'doughnut',data:{labels:Object.keys(counts),datasets:[{
+    data:Object.values(counts),
+    backgroundColor:['#ffd70080','#58a6ff80','#f8514980','#d2992280'],
+    borderColor:Object.keys(counts).map(s=>SC[s]),borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:CD.plugins}});
+  const fat=C.filter(c=>c.performance_status==='fatigued'&&c.ctr_decay_pct!=null)
+    .sort((a,b)=>a.ctr_decay_pct-b.ctr_decay_pct).slice(0,15);
+  mc('ch-fat-bar',{type:'bar',data:{labels:fat.map(c=>`#${c.creative_id}`),
+    datasets:[{label:'CTR Decay %',data:fat.map(c=>+(c.ctr_decay_pct*100).toFixed(1)),
+      backgroundColor:'#f8514980',borderColor:'#f85149',borderWidth:1,borderRadius:4}]},
+    options:{...CD,indexAxis:'y',plugins:{...CD.plugins,legend:{display:false}}}});
+  const tbl=C.filter(c=>c.performance_status==='fatigued').sort((a,b)=>a.ctr_decay_pct-b.ctr_decay_pct).slice(0,30);
+  document.getElementById('fat-table').innerHTML=`<table><thead><tr>
+    <th>ID</th><th>Advertiser</th><th>Format</th><th>KPI</th><th>Fatigue Day</th>
+    <th>CTR Decay</th><th>First 7d CTR</th><th>Last 7d CTR</th><th>CTR Retained</th></tr></thead><tbody>
+    ${tbl.map(c=>{const ret=(c.last_7d_ctr/(c.first_7d_ctr||1e-6)*100).toFixed(0);
+      return `<tr onclick="openModal(${c.creative_id})" style="cursor:pointer">
+      <td><code>#${c.creative_id}</code></td><td>${c.advertiser_name}</td><td>${c.ad_format}</td>
+      <td><span class="kpi-badge">${c.kpi_goal||'?'}</span></td>
+      <td>${c.fatigue_day||'—'}</td>
+      <td style="color:var(--fatigued);font-weight:700">${(c.ctr_decay_pct*100).toFixed(1)}%</td>
+      <td>${pct(c.first_7d_ctr,3)}</td><td>${pct(c.last_7d_ctr,3)}</td>
+      <td>${ret}% <span style="color:var(--muted);font-size:10px">of launch</span></td>
+    </tr>`;}).join('')}</tbody></table>`;
+  popFatCreatives();
+}
+function popFatCreatives(){
+  const adv=document.getElementById('fat-adv').value, st=document.getElementById('fat-status').value;
+  let pool=C;
+  if(adv) pool=pool.filter(c=>c.advertiser_name===adv);
+  if(st) pool=pool.filter(c=>c.performance_status===st);
+  pool=pool.sort((a,b)=>(a.ctr_decay_pct||0)-(b.ctr_decay_pct||0));
+  const sel=document.getElementById('fat-cid');
+  sel.innerHTML=pool.map(c=>`<option value="${c.creative_id}">#${c.creative_id} ${c.advertiser_name} [${c.performance_status}/${c.kpi_goal||'?'}] ${((c.ctr_decay_pct||0)*100).toFixed(0)}% decay</option>`).join('');
+  if(pool.length) renderFatigueChart();
+}
+function renderFatigueChart(){
+  const cid=document.getElementById('fat-cid').value;
+  const view=document.getElementById('fat-view').value;
+  const c=CMAP[cid]; const tsArr=TS[cid];
+  if(!c||!tsArr||!tsArr.length) return;
+  // TS is an array of {d, ctr, ctr_norm?} objects — extract into flat arrays
+  const ts={
+    d:       tsArr.map(e=>e.d),
+    ctr:     tsArr.map(e=>e.ctr),
+    ctr_norm:tsArr.map(e=>e.ctr_norm??null),
+  };
+  const isNorm=view==='norm';
+  const vals=isNorm?ts.ctr_norm.map(v=>v??0):ts.ctr.map(v=>+(v*100).toFixed(4));
+  const roll=vals.map((_,i)=>{const sl=vals.slice(Math.max(0,i-2),i+3);return +(sl.reduce((a,b)=>a+b,0)/sl.length).toFixed(isNorm?1:4);});
+  // Benchmark lines for normalized view
+  const datasets=[
+    {label:isNorm?'Normalized CTR (% of first week)':'Daily CTR (%)',data:vals,
+      borderColor:'#58a6ff',backgroundColor:'#58a6ff12',tension:.3,pointRadius:2,fill:true},
+    {label:'5-day rolling avg',data:roll,borderColor:'#ffd700',borderDash:[4,3],tension:.3,pointRadius:0,fill:false},
+  ];
+  if(isNorm){
+    const bench=ML.status_ctr_retention;
+    datasets.push({label:'Top performer benchmark',data:ts.d.map(()=>+(bench.top_performer*100).toFixed(0)),
+      borderColor:'#ffd70060',borderDash:[2,6],pointRadius:0,tension:0,fill:false});
+    datasets.push({label:'Fatigued benchmark',data:ts.d.map(()=>+(bench.fatigued*100).toFixed(0)),
+      borderColor:'#f8514960',borderDash:[2,6],pointRadius:0,tension:0,fill:false});
+  }
+  dk('ch-fat-line');
+  charts['ch-fat-line']=new Chart(document.getElementById('ch-fat-line'),{type:'line',data:{labels:ts.d,datasets},
+    options:{...CD,scales:{
+      x:{...CD.scales.x,ticks:{...CD.scales.x.ticks,maxTicksLimit:12}},
+      y:{...CD.scales.y,title:{display:true,text:isNorm?'% of launch-week CTR':'CTR (%)',color:'#8b949e'}}}}});
+  const decay=c.ctr_decay_pct||0;
+  const retain=((c.last_7d_ctr/(c.first_7d_ctr||1e-6))*100).toFixed(0);
+  const cml=ML.creative_ml[c.creative_id]||{};
+  const benchRetain=(ML.status_ctr_retention[c.performance_status]||0.2)*100;
+  document.getElementById('fat-stats').innerHTML=`
+    <div class="fs"><div class="lbl">Status</div><div class="val"><span class="badge ${c.performance_status}">${c.performance_status.replace('_',' ')}</span></div></div>
+    <div class="fs"><div class="lbl">KPI Goal</div><div class="val" style="color:var(--purple)">${c.kpi_goal||'?'}</div></div>
+    <div class="fs"><div class="lbl">CTR Retained</div><div class="val ${retain<20?'bad':retain>30?'good':''}">${retain}%</div></div>
+    <div class="fs"><div class="lbl">Status benchmark</div><div class="val">${benchRetain.toFixed(0)}%</div></div>
+    <div class="fs"><div class="lbl">CTR Decay</div><div class="val ${decay<-0.5?'bad':''}">${(decay*100).toFixed(1)}%</div></div>
+    <div class="fs"><div class="lbl">Fatigue Day</div><div class="val ${c.fatigue_day?'bad':''}">${c.fatigue_day||'Not detected'}</div></div>
+    <div class="fs"><div class="lbl">Days Active</div><div class="val">${c.total_days_active}</div></div>
+    <div class="fs"><div class="lbl">Cluster</div><div class="val">C${cml.cluster??'?'}</div></div>`;
+}
+
+// ── RECOMMENDATIONS ───────────────────────────────────────────────────────────
+function getAction(c){
+  const kpi=c.kpi_goal, st=c.performance_status;
+  const kpiM=KPI_METRIC[kpi], kpiL=KPI_LABEL[kpi];
+  const kpiVal=kpiM?kpiFmt(kpi,c[kpiM])+' '+kpiL:'';
+  if(st==='top_performer') return {action:'scale',reason:`Top performer · ${kpiVal} · Scale & create variants`};
+  if(st==='fatigued') return {action:'pause',reason:`Fatigue day ${c.fatigue_day||'?'} · ${(c.ctr_decay_pct*100).toFixed(0)}% CTR decay · Pause or refresh`};
+  if(st==='underperformer') return {action:'pause',reason:`Underperformer · ${kpi} metric below threshold`};
+  if(c.perf_score>=0.65) return {action:'scale',reason:`Strong stable · perf ${((c.perf_score||0)*100).toFixed(0)}/100 · Consider scaling`};
+  if((c.ctr_decay_pct||0)<-0.25) return {action:'monitor',reason:`Early decay signal · Watch before fatigue sets in`};
+  return {action:'monitor',reason:`Stable · review in 7 days`};
+}
+function renderReco(){
+  const adv=document.getElementById('r-adv').value, vert=document.getElementById('r-vert').value,
+    kpi=document.getElementById('r-kpi').value, af=document.getElementById('r-action').value;
+  let pool=C;
+  if(adv) pool=pool.filter(c=>c.advertiser_name===adv);
+  if(vert) pool=pool.filter(c=>c.vertical===vert);
+  if(kpi) pool=pool.filter(c=>c.kpi_goal===kpi);
+  const tagged=pool.map(c=>({...c,...getAction(c)}));
+  const filt=af?tagged.filter(c=>c.action===af):tagged;
+  const cnt={scale:0,pause:0,monitor:0}; tagged.forEach(c=>cnt[c.action]++);
+  document.getElementById('reco-summary').innerHTML=
+    `<div class="card" style="text-align:center"><div style="font-size:32px;font-weight:800;color:var(--accent2)">${cnt.scale}</div><div style="color:var(--muted);font-size:10px;text-transform:uppercase;margin-top:3px">Scale</div></div>
+     <div class="card" style="text-align:center"><div style="font-size:32px;font-weight:800;color:var(--fatigued)">${cnt.pause}</div><div style="color:var(--muted);font-size:10px;text-transform:uppercase;margin-top:3px">Pause</div></div>
+     <div class="card" style="text-align:center"><div style="font-size:32px;font-weight:800;color:var(--warn)">${cnt.monitor}</div><div style="color:var(--muted);font-size:10px;text-transform:uppercase;margin-top:3px">Monitor</div></div>`;
+  const sorted=filt.sort((a,b)=>{const o={scale:0,pause:1,monitor:2};return (o[a.action]||0)-(o[b.action]||0)||(b.perf_score||0)-(a.perf_score||0);}).slice(0,120);
+  document.getElementById('reco-table').innerHTML=`<table><thead><tr>
+    <th>Action</th><th>ID</th><th>Advertiser</th><th>Vertical</th><th>Format</th>
+    <th>KPI</th><th>Perf</th><th>CTR</th><th>Primary KPI metric</th><th>Cluster</th><th>Reason</th></tr></thead><tbody>
+    ${sorted.map(c=>`<tr onclick="openModal(${c.creative_id})" style="cursor:pointer">
+      <td><span class="ac ${c.action}">${c.action.toUpperCase()}</span></td>
+      <td><code>#${c.creative_id}</code></td><td>${c.advertiser_name}</td><td>${c.vertical}</td><td>${c.ad_format}</td>
+      <td><span class="kpi-badge">${c.kpi_goal||'?'}</span></td>
+      <td>${((c.perf_score||0)*100).toFixed(0)}/100</td>
+      <td>${pct(c.overall_ctr)}</td>
+      <td>${c.kpi_goal&&KPI_METRIC[c.kpi_goal]?kpiFmt(c.kpi_goal,c[KPI_METRIC[c.kpi_goal]])+' '+KPI_LABEL[c.kpi_goal]:'—'}</td>
+      <td>C${(ML.creative_ml[c.creative_id]||{}).cluster??'?'}</td>
+      <td style="color:var(--muted);font-size:10px">${c.reason}</td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+// ── ML INSIGHTS ───────────────────────────────────────────────────────────────
+const _FI_LABEL={
+  perf_score:'overall performance score',
+  ctr:'click-through rate (CTR)',
+  cvr:'conversion rate (CVR)',
+  roas:'return on ad spend (ROAS)',
+  kpi_CPA:'CVR for CPA-goal campaigns',
+  kpi_ROAS:'ROAS for ROAS-goal campaigns',
+  kpi_IPM:'installs per mille (IPM) for IPM-goal campaigns',
+  kpi_CTR:'CTR for CTR-goal campaigns',
+};
+
+async function renderFI(){
+  const metric=document.getElementById('fi-metric').value;
+  const items=(ML.feature_importance[metric]||[]);
+  const explainEl=document.getElementById('fi-explain');
+  if(!items.length){document.getElementById('fi-bars').innerHTML='<div class="empty">No data</div>';explainEl.innerHTML='';return;}
+  const maxI=items[0].importance;
+  const colors={ad_format_enc:'#58a6ff',format_enc:'#58a6ff',vertical_enc:'#bc8cff',duration_sec:'#ffa657',
+    novelty_score:'#3fb950',has_gameplay:'#ffd700',motion_score:'#f85149',
+    clutter_score:'#d29922',brand_visibility_score:'#58a6ff',readability_score:'#79c0ff'};
+  document.getElementById('fi-bars').innerHTML=items.map(x=>{
+    const pct2=(x.importance/maxI*100).toFixed(0);
+    const col=colors[x.name]||'#58a6ff';
+    const nm=x.name.replace(/_enc$/,'').replace(/_/g,' ');
+    return `<div class="fi-bar"><div class="fi-lbl">${nm}</div>
+      <div class="fi-tr"><div class="fi-fill" style="width:${pct2}%;background:${col}80;border:1px solid ${col}20"></div>
+        <span class="fi-val">${(x.importance*100).toFixed(1)}%</span></div></div>`;}).join('');
+
+  // Serve from cache if available
+  if(_fiCache[metric]){
+    explainEl.innerHTML=`<p style="color:var(--text);font-size:12px;line-height:1.7">${_fiCache[metric]}</p>`;
+    return;
+  }
+
+  // Show loading state
+  explainEl.innerHTML='<p style="color:var(--muted);font-size:11px">🤖 Generating interpretation…</p>';
+  if(!_apiKey){
+    explainEl.innerHTML='<p style="color:var(--muted);font-size:11px">Set GEMINI_API_KEY to enable AI-generated interpretations.</p>';
+    return;
+  }
+
+  // Build context — top 8 features with importance rank + direction from SHAP if available
+  const shapProfile = (ML.cluster_shap_profiles||{});
+  const topFeats = items.slice(0,8).map((f,i)=>{
+    const nm = f.name.replace(/_enc$/,'').replace(/_/g,' ');
+    return `${i+1}. ${nm} (importance ${(f.importance*100).toFixed(1)}%)`;
+  }).join('\n');
+  const metricLabel=_FI_LABEL[metric]||metric;
+  const userMsg =
+    `A Random Forest model was trained on pre-campaign mobile ad creative attributes to predict ${metricLabel}.\n\n` +
+    `Top features ranked by importance (these are measured BEFORE the campaign runs — no outcome leakage):\n${topFeats}\n\n` +
+    `Feature definitions for context:\n` +
+    `- ad_format: rewarded_video / interstitial / playable / banner / native\n` +
+    `- vertical: gaming / ecommerce / fintech / travel / health / entertainment\n` +
+    `- theme: the creative concept (gameplay, discount, testimonial, ugc, etc.)\n` +
+    `- tone: emotional tone of the ad (excited, calm, urgent, premium, etc.)\n` +
+    `- language: ad copy language (en, es, de, fr, it, pt, ja)\n` +
+    `- target_age_segment: campaign audience age bracket (18-24, 25-34, 35-44, 45-54)\n` +
+    `- hook_type: opening hook style (last-minute deal, challenge, story, etc.)\n` +
+    `- duration_sec: video length in seconds (0 for static)\n` +
+    `- motion_score: 0–1 fraction of frames with significant movement\n` +
+    `- novelty_score: 0–1 visual distinctiveness vs dataset average\n` +
+    `- text_density: 0–1 fraction of visual area covered by text\n` +
+    `- clutter_score: 0–1 visual busyness (higher = harder to process)\n` +
+    `- brand_visibility_score: 0–1 logo/brand prominence\n` +
+    `- readability_score: 0–1 copy clarity\n` +
+    `- has_gameplay: 1 if gameplay footage visible\n` +
+    `- has_ugc_style: 1 if user-generated content aesthetic\n` +
+    `- n_countries: number of target countries in campaign\n` +
+    `- copy_length_chars: character count of ad copy\n` +
+    `- product_count / faces_count: objects visible in creative\n\n` +
+    `Task: Write 3–4 sentences explaining (1) which features matter most and why they drive ${metricLabel}, ` +
+    `(2) what this tells a creative designer to prioritise. ` +
+    `Base your reasoning ONLY on the importance ranking above — do not introduce metrics or features not listed. ` +
+    `Use plain marketing language, no ML jargon.`;
+
+  try{
+    const text=await callGemini(
+      'You are an expert mobile advertising creative strategist. Ground every claim in the feature importance data provided.',
+      [{role:'user',content:userMsg}],
+      6000
+    );
+    _fiCache[metric]=text;
+    explainEl.innerHTML=`<p style="color:var(--text);font-size:12px;line-height:1.7">${markdownToHtml(text)}</p>`;
+  }catch(err){
+    explainEl.innerHTML=`<p style="color:var(--warn);font-size:11px">Could not generate interpretation: ${err.message}</p>`;
+  }
+}
+function insTab(t,btn){
+  ['fi','patterns','dna'].forEach(id=>document.getElementById('ins-'+id).style.display='none');
+  document.querySelectorAll('.stbar .stbtn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('ins-'+t).style.display=''; btn.classList.add('active');
+  if(t==='patterns') renderPatterns();
+  if(t==='dna') renderDNA();
+}
+function groupBy(data,key,metric){
+  const m={};
+  data.forEach(c=>{const k=c[key]||'?',v=c[metric]||0;if(!m[k]){m[k]={s:0,n:0};}m[k].s+=v;m[k].n++;});
+  return Object.entries(m).map(([k,v])=>({label:k,avg:v.s/v.n,count:v.n})).sort((a,b)=>b.avg-a.avg);
+}
+function hBar(id,groups,color){
+  const top=groups.slice(0,12);
+  mc(id,{type:'bar',data:{labels:top.map(g=>g.label),datasets:[{label:'avg',data:top.map(g=>+g.avg.toFixed(6)),
+    backgroundColor:color+'70',borderColor:color,borderWidth:1,borderRadius:4}]},
+    options:{...CD,indexAxis:'y',plugins:{...CD.plugins,legend:{display:false}}}});
+}
+function renderPatterns(){
+  const metric=document.getElementById('pat-metric').value;
+  const kpi=document.getElementById('pat-kpi').value;
+  const vert=document.getElementById('pat-vert').value;
+  let pool=C;
+  if(kpi) pool=pool.filter(c=>c.kpi_goal===kpi);
+  if(vert) pool=pool.filter(c=>c.vertical===vert);
+  hBar('ch-theme', groupBy(pool,'theme',metric),'#bc8cff');
+  hBar('ch-format',groupBy(pool,'ad_format',metric),'#58a6ff');
+  hBar('ch-hook',  groupBy(pool,'hook_type',metric),'#3fb950');
+  hBar('ch-tone',  groupBy(pool,'tone',metric),'#ffa657');
+}
+function renderDNA(){
+  const vert=document.getElementById('dna-vert').value, kpi=document.getElementById('dna-kpi').value;
+  let pool=C;
+  if(vert) pool=pool.filter(c=>c.vertical===vert);
+  if(kpi) pool=pool.filter(c=>c.kpi_goal===kpi);
+  const top=pool.filter(c=>c.performance_status==='top_performer'||c.perf_score>=0.75);
+  if(!top.length){document.getElementById('dna-content').innerHTML='<div class="empty">No top performers in this filter.</div>';return;}
+  const co=key=>{const m={};top.forEach(c=>{const k=c[key]||'?';m[k]=(m[k]||0)+1;});return Object.entries(m).sort((a,b)=>b[1]-a[1])[0]||['?',0];};
+  const [bT,tc]=co('theme'),[bF,fc]=co('ad_format'),[bH,hc]=co('hook_type'),[bTn,tnc]=co('tone'),[bC,cc]=co('dominant_color'),[bK,kc]=co('kpi_goal');
+  const avgNov=(top.reduce((s,c)=>s+(c.novelty_score||0),0)/top.length*100).toFixed(0);
+  const pctUGC=(top.filter(c=>c.has_ugc_style).length/top.length*100).toFixed(0);
+  const pctGP=(top.filter(c=>c.has_gameplay).length/top.length*100).toFixed(0);
+  document.getElementById('dna-content').innerHTML=`
+    <div style="background:var(--surface2);border-radius:9px;padding:14px;margin-bottom:12px">
+      <div style="color:var(--muted);font-size:11px;margin-bottom:9px">Based on <b style="color:var(--text)">${top.length}</b> high-performing creatives.</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:9px">
+        <div class="sb"><div class="v">${bF}</div><div class="l">Best Format (${fc})</div></div>
+        <div class="sb"><div class="v">${bT}</div><div class="l">Top Theme (${tc})</div></div>
+        <div class="sb"><div class="v">${bH}</div><div class="l">Top Hook (${hc})</div></div>
+        <div class="sb"><div class="v">${bTn}</div><div class="l">Winning Tone (${tnc})</div></div>
+        <div class="sb"><div class="v">${bC}</div><div class="l">Top Color (${cc})</div></div>
+        <div class="sb"><div class="v">${bK}</div><div class="l">Most common KPI (${kc})</div></div>
+        <div class="sb"><div class="v">${avgNov}%</div><div class="l">Avg Novelty</div></div>
+        <div class="sb"><div class="v">${pctUGC}%</div><div class="l">UGC Style %</div></div>
+        <div class="sb"><div class="v">${pctGP}%</div><div class="l">Gameplay %</div></div>
+      </div>
+    </div>
+    <div style="background:var(--surface2);border-radius:9px;padding:14px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:7px">💡 Next test suggestion</div>
+      <div style="font-size:12px;line-height:1.8">
+        Winning formula: <b>${bF}</b> · <b>${bT}</b> theme · <b>${bH}</b> hook · <b>${bTn}</b> tone · <b>${bC}</b> background.
+        For <b>${bK}</b> campaigns, this combination outperforms peers.
+        Try swapping only the hook (keep format+theme) or changing emotional tone.
+        Gameplay appears in ${pctGP}% of top performers — ${+pctGP>30?'strongly worth including.':'test with gameplay variants.'}
+        Novelty avg ${avgNov}% — audiences reward fresh, original creative concepts.
+      </div>
+    </div>`;
+}
+
+// ── CLUSTERS ──────────────────────────────────────────────────────────────────
+const CLR=['#58a6ff','#3fb950','#ffa657','#bc8cff','#ffd700','#f85149','#79c0ff','#d29922'];
+function renderClusters(){
+  document.getElementById('cluster-cards').innerHTML=Object.entries(ML.cluster_profiles).map(([k,p])=>{
+    const color = CLR[(+k-1) % CLR.length];
+    const shap  = (ML.cluster_shap_profiles||{})[k];
+    const topFeats = shap
+      ? shap.top.slice(0,3).map(f=>{
+          const label = f.name.replace(/_enc$/,'').replace(/_/g,' ');
+          const dir   = f.shap >= 0 ? '▲' : '▼';
+          const col   = f.shap >= 0 ? 'var(--accent2)' : 'var(--danger)';
+          return `<span style="font-size:9px;color:${col}">${dir} ${label}</span>`;
+        }).join(' · ')
+      : '';
+    return `
+    <div class="cl-card" onclick="selectCluster(${k})">
+      <div style="font-size:26px;font-weight:800;color:${color}">C${k}</div>
+      <div style="font-size:12px;font-weight:600;margin:3px 0">${p.top_format}</div>
+      <div style="font-size:10px;color:var(--muted)">${p.top_theme} · ${p.top_tone}</div>
+      <div style="font-size:10px;color:var(--purple);margin-top:2px">KPI: ${p.top_kpi}</div>
+      <div style="margin-top:7px;display:flex;justify-content:space-between;font-size:10px">
+        <span style="color:var(--muted)">n=${p.size}</span>
+        <span style="color:var(--accent2)">perf ${(p.avg_perf*100).toFixed(0)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted)">
+        <span>CTR ${(p.avg_ctr*100).toFixed(2)}%</span><span>ROAS ${p.avg_roas.toFixed(2)}x</span>
+      </div>
+      ${topFeats ? `<div style="margin-top:5px;font-size:9px;line-height:1.5;border-top:1px solid var(--border);padding-top:4px"><span style="color:var(--muted)">Drivers: </span>${topFeats}</div>` : ''}
+      <div style="margin-top:5px;display:flex;gap:2px;flex-wrap:wrap">
+        ${Object.entries(p.status_dist).filter(([,v])=>v>0).map(([s,v])=>`<span class="badge ${s}">${v}</span>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+function selectCluster(k){
+  document.getElementById('cl-sel').value=k; renderClusterCreatives();
+  document.querySelectorAll('.cl-card').forEach(e=>e.classList.toggle('sel',e.querySelector('[style*="font-size:26px"]')?.textContent===`C${k}`));
+}
+function renderClusterCreatives(){
+  const k=document.getElementById('cl-sel').value;
+  if(k===''){document.getElementById('cl-creatives').innerHTML='';return;}
+  const pool=C.filter(c=>(ML.creative_ml[c.creative_id]||{}).cluster===+k).sort((a,b)=>(b.perf_score||0)-(a.perf_score||0));
+  document.getElementById('cl-creatives').innerHTML=`<div class="cg">${pool.map(cCard).join('')}</div>`;
+}
+function renderClusterPerf(){
+  const entries=Object.entries(ML.cluster_profiles).sort((a,b)=>+a[0]-+b[0]);
+  mc('ch-cl-perf',{type:'bar',data:{labels:entries.map(([k])=>`C${k}`),datasets:[
+    {label:'Perf×100',data:entries.map(([,p])=>+(p.avg_perf*100).toFixed(1)),backgroundColor:'#58a6ff70',borderColor:'#58a6ff',borderWidth:1,borderRadius:4},
+    {label:'CTR×1000',data:entries.map(([,p])=>+(p.avg_ctr*1000).toFixed(2)),backgroundColor:'#3fb95070',borderColor:'#3fb950',borderWidth:1,borderRadius:4},
+    {label:'ROAS',data:entries.map(([,p])=>+p.avg_roas.toFixed(2)),backgroundColor:'#ffa65770',borderColor:'#ffa657',borderWidth:1,borderRadius:4}]},
+    options:{...CD}});
+}
+
+async function explainCluster(k){
+  if(!k){ return; }
+  const out=document.getElementById('cl-explain-out');
+  if(!_apiKey){
+    out.innerHTML='<div class="explain-box" style="border-color:var(--warn)">⚠ API key not set — rebuild with GEMINI_API_KEY in .env.</div>'; return;
+  }
+  if(_clusterExplainCache[k]){
+    out.innerHTML=`<div class="explain-box">${markdownToHtml(_clusterExplainCache[k])}</div>`; return;
+  }
+  out.innerHTML='<div class="explain-loading">🤖 Gemini is analysing cluster C'+k+'…</div>';
+
+  const p   = ML.cluster_profiles[k]||{};
+  const shap= (ML.cluster_shap_profiles||{})[k];
+
+  // Format SHAP drivers
+  const shapLines = shap
+    ? shap.top.slice(0,8).map((f,i)=>{
+        const nm  = f.name.replace(/_enc$/,'').replace(/_/g,' ');
+        const dir = f.shap>=0 ? '+' : '-';
+        return `${i+1}. ${nm}: mean SHAP ${dir}${Math.abs(f.shap).toFixed(4)} (${f.shap>=0?'pushes toward this cluster':'pulls away from this cluster'})`;
+      }).join('\n')
+    : 'SHAP data not available for this cluster.';
+
+  const userMsg =
+    `You are describing a group of similar mobile ads to a non-technical marketing manager who has never heard of machine learning.\n\n` +
+    `This group (called Cluster C${k}) contains ${p.size} ads with these typical traits:\n` +
+    `- Most common ad format: ${p.top_format}\n` +
+    `- Most common creative theme: ${p.top_theme}\n` +
+    `- Most common emotional tone: ${p.top_tone}\n` +
+    `- Most common campaign goal: ${p.top_kpi}\n` +
+    `- Average performance score: ${((p.avg_perf||0)*100).toFixed(0)}/100\n` +
+    `- Average click-through rate: ${((p.avg_ctr||0)*100).toFixed(2)}%\n` +
+    `- Average ROAS: ${(p.avg_roas||0).toFixed(2)}x\n\n` +
+    `The following creative attributes are the strongest signals that set this group apart from all other ads. ` +
+    `A "+" means ads in this group tend to have MORE of that attribute than average; a "-" means they tend to have LESS:\n${shapLines}\n\n` +
+    `Task: Write 3–5 sentences in plain, jargon-free marketing language that a brand manager would understand. Cover:\n` +
+    `(1) What kind of ad does this group represent — give it a descriptive name a marketer would relate to.\n` +
+    `(2) What creative choices define it (format, look, feel, content) — explain WHY those choices matter for performance, not just what they are.\n` +
+    `(3) When should an advertiser use or avoid this type of creative?\n\n` +
+    `STRICT RULES — violating any of these will make the output unusable:\n` +
+    `- NEVER use the words: SHAP, cluster, K-Means, model, classifier, feature, coefficient, algorithm, ML, or any technical term.\n` +
+    `- Do NOT say "positive signal", "negative signal", "driver", or "coefficient".\n` +
+    `- Do NOT mention the cluster number (C${k}) in the output — describe the ad type by its traits.\n` +
+    `- Base every claim ONLY on the data provided above. Do not invent facts.`;
+
+  try{
+    const text = await callGemini(
+      'You are an expert mobile advertising consultant writing for brand managers who have no data science background. You describe ad creative patterns in plain, human terms — as if explaining to a client over coffee. You never use technical jargon: no SHAP, no cluster, no model, no feature, no algorithm. You translate data signals into creative intuition and business implications.',
+      [{role:'user', content:userMsg}],
+      6000
+    );
+    _clusterExplainCache[k]=text;
+    out.innerHTML=`<div class="explain-box">${markdownToHtml(text)}</div>`;
+  }catch(err){
+    out.innerHTML=`<div class="explain-box" style="border-color:var(--danger)">⚠ Error: ${err.message}</div>`;
+  }
+}
+
+// ── PORTFOLIO OPTIMIZER ───────────────────────────────────────────────────────
+let portfolio=[];
+function ortSearch(){
+  const q=document.getElementById('ort-q').value.toLowerCase();
+  const el=document.getElementById('ort-results');
+  if(!q){el.innerHTML='';return;}
+  const hits=C.filter(c=>String(c.creative_id).includes(q)||c.headline?.toLowerCase().includes(q)||c.advertiser_name?.toLowerCase().includes(q)).slice(0,10);
+  el.innerHTML=hits.map(c=>`<div onclick="addToPortfolio(${c.creative_id})" style="padding:7px 10px;cursor:pointer;border-bottom:1px solid var(--border);font-size:11px;display:flex;justify-content:space-between;align-items:center">
+    <span><b>#${c.creative_id}</b> ${c.advertiser_name} · ${c.headline||c.ad_format}</span>
+    <span class="kpi-badge">${c.kpi_goal||'?'}</span></div>`).join('')||'<div style="padding:9px 10px;color:var(--muted);font-size:11px">No results</div>';
+}
+function addToPortfolio(cid){
+  if(portfolio.includes(cid))return;
+  portfolio.push(cid); renderPortfolio(); computeOrtho();
+  document.getElementById('ort-q').value=''; document.getElementById('ort-results').innerHTML='';
+}
+function removeFromPortfolio(cid){portfolio=portfolio.filter(id=>id!==cid);renderPortfolio();computeOrtho();}
+function clearPortfolio(){portfolio=[];renderPortfolio();computeOrtho();}
+function renderPortfolio(){
+  const el=document.getElementById('ort-portfolio');
+  if(!portfolio.length){el.innerHTML='<span style="color:var(--muted);font-size:11px">No creatives added yet…</span>';return;}
+  el.innerHTML=portfolio.map(cid=>{const c=CMAP[cid];
+    return `<span class="ort-chip" onclick="removeFromPortfolio(${cid})" title="Click to remove">#${cid} ${c?.advertiser_name||''}</span>`;}).join('');
+}
+// ── Creative Diversity metric ─────────────────────────────────────────────
+// Replaces Gram-Schmidt subspace projection (which gives ~100% for almost
+// everything in high-D spaces due to the curse of dimensionality).
+//
+// New metric: minimum distance to the closest portfolio creative, as a blend of:
+//   65% categorical divergence  — key creative attributes that differ
+//   35% cosine distance in 6D PCA — top 6 PCs, variance-weighted
+//
+// 0% = identical to something you already run. 100% = completely unlike anything.
+
+const DIV_CAT_W = 0.65;
+const DIV_PCA_W = 0.35;
+const DIV_N_PCS = 6;
+
+const DIV_CAT_FIELDS = ['ad_format','vertical','theme','tone','kpi_goal','os'];
+const DIV_BIN_FIELDS = ['has_gameplay','has_ugc_style','has_price','has_discount_badge'];
+
+const _pcaEV = (ML.pca_explained_variance||[]).slice(0,DIV_N_PCS);
+const _pcaEVSum = _pcaEV.reduce((s,x)=>s+x,0)||1;
+const _pcaW = _pcaEV.map(x=>x/_pcaEVSum);
+
+function catDiff(a,b){
+  const fields=[...DIV_CAT_FIELDS,...DIV_BIN_FIELDS];
+  let diff=0;
+  fields.forEach(f=>{if((a[f]??'')!==(b[f]??''))diff++;});
+  return diff/fields.length;
+}
+
+function pcaCosDist(pcA,pcB){
+  if(!pcA||!pcB||pcA.length<DIV_N_PCS||pcB.length<DIV_N_PCS)return 0.5;
+  let dot=0,na=0,nb=0;
+  for(let i=0;i<DIV_N_PCS;i++){
+    const w=_pcaW[i];
+    dot+=w*pcA[i]*pcB[i];
+    na+=w*pcA[i]*pcA[i];
+    nb+=w*pcB[i]*pcB[i];
+  }
+  const cos=dot/(Math.sqrt(na*nb)+1e-10);
+  return (1-Math.max(-1,Math.min(1,cos)))/2;
+}
+
+function creativeDiversity(cand,portCreatives){
+  if(!portCreatives.length)return 1.0;
+  const pcC=(ML.creative_ml[cand.creative_id]||{}).pc||null;
+  let minDist=1.0;
+  for(const p of portCreatives){
+    const pcP=(ML.creative_ml[p.creative_id]||{}).pc||null;
+    const d=DIV_CAT_W*catDiff(cand,p)+DIV_PCA_W*pcaCosDist(pcC,pcP);
+    if(d<minDist)minDist=d;
+  }
+  return minDist;
+}
+
+function portfolioClusterCoverage(portCreatives){
+  const clusters=new Set(portCreatives.map(c=>(ML.creative_ml[c.creative_id]||{}).cluster).filter(x=>x!=null));
+  const total=Object.keys(ML.cluster_profiles||{}).length||8;
+  return clusters.size/total;
+}
+
+function updateStrategyLabel(){
+  const v=parseInt(document.getElementById('ort-alpha').value);
+  let lbl;
+  if(v<10) lbl='Pure performance';
+  else if(v<30) lbl=`Performance-focused (${100-v}% perf · ${v}% ortho)`;
+  else if(v<45) lbl=`Leaning performance (${100-v}% · ${v}%)`;
+  else if(v<55) lbl=`Balanced (${100-v}% perf · ${v}% ortho)`;
+  else if(v<70) lbl=`Leaning orthogonal (${100-v}% · ${v}%)`;
+  else if(v<90) lbl=`Diversity-focused (${100-v}% perf · ${v}% ortho)`;
+  else lbl='Pure creative diversity';
+  document.getElementById('ort-alpha-label').textContent=lbl;
+}
+function computeOrtho(){
+  const recsEl=document.getElementById('ort-recs'), covEl=document.getElementById('cov-lbl');
+  const alpha=(parseInt(document.getElementById('ort-alpha')?.value)||50)/100;
+  const kpiFilt=document.getElementById('ort-kpi').value;
+  const stFilt=document.getElementById('ort-status').value;
+  const targetKPIs=Array.from(document.querySelectorAll('.ort-kpi-cb:checked')).map(x=>x.value);
+  if(!portfolio.length){
+    recsEl.innerHTML='<div class="empty">Add creatives to your portfolio to see recommendations.</div>';
+    covEl.textContent='—'; renderCovChart(0); return;
+  }
+  // Build portfolio creative objects (needed for categorical comparison)
+  const portCreatives=portfolio.map(cid=>CMAP[cid]).filter(Boolean);
+  if(!portCreatives.length){recsEl.innerHTML='<div class="empty">No creative data for portfolio.</div>';return;}
+
+  // Coverage = fraction of 8 K-Means clusters covered by portfolio
+  const coverage=portfolioClusterCoverage(portCreatives);
+  const clusterCount=new Set(portCreatives.map(c=>(ML.creative_ml[c.creative_id]||{}).cluster).filter(x=>x!=null)).size;
+  const totalClusters=Object.keys(ML.cluster_profiles||{}).length||8;
+  covEl.innerHTML=`<span style="font-size:26px;font-weight:700;color:var(--purple)">${clusterCount}/${totalClusters}</span>`;
+  renderCovChart(coverage);
+
+  const portSet=new Set(portfolio.map(String));
+  let cands=C.filter(c=>!portSet.has(String(c.creative_id)));
+  if(kpiFilt) cands=cands.filter(c=>c.kpi_goal===kpiFilt);
+  if(stFilt) cands=cands.filter(c=>c.performance_status===stFilt);
+
+  const scored=cands.map(c=>{
+    const divScore=creativeDiversity(c,portCreatives);  // 0..1
+    const rawPerf=c.perf_score||0;
+    const kpiBoost=targetKPIs.length&&targetKPIs.includes(c.kpi_goal)?2.0:1.0;
+    const perfScore=Math.min(rawPerf*kpiBoost,1);
+    const combined=(1-alpha)*perfScore + alpha*divScore;
+    return {c,divScore,perfScore,combined};
+  }).sort((a,b)=>b.combined-a.combined).slice(0,12);
+
+  if(!scored.length){recsEl.innerHTML='<div class="empty">No candidates match filters.</div>';return;}
+  const maxS=scored[0].combined;
+  recsEl.innerHTML=scored.map(({c,divScore,perfScore,combined})=>{
+    const cml=ML.creative_ml[c.creative_id]||{};
+    const kpiMatch=targetKPIs.length&&targetKPIs.includes(c.kpi_goal);
+    // Show which categorical fields differ from closest portfolio creative
+    const portCreatives2=portCreatives;
+    const closest=portCreatives2.reduce((best,p)=>{
+      const d=DIV_CAT_W*catDiff(c,p)+DIV_PCA_W*pcaCosDist((ML.creative_ml[c.creative_id]||{}).pc,(ML.creative_ml[p.creative_id]||{}).pc);
+      return d<best.d?{d,p}:best;
+    },{d:1.1,p:null});
+    const diffFields=closest.p?[...DIV_CAT_FIELDS,...DIV_BIN_FIELDS].filter(f=>(c[f]??'')!==(closest.p[f]??'')).slice(0,3):[];
+    return `<div class="ort-item" onclick="openModal(${c.creative_id})">
+      <img src="${c.asset_file||''}" style="width:100%;height:75px;object-fit:cover;border-radius:5px;background:var(--surface2)" loading="lazy" onerror="this.style.display='none'"/>
+      <div style="font-size:10px;color:var(--muted);margin-top:4px">#${c.creative_id} · C${cml.cluster??'?'} · <span class="kpi-badge" style="${kpiMatch?'border-color:var(--accent2);color:var(--accent2)':''}">${c.kpi_goal||'?'}${kpiMatch?' ★':''}</span></div>
+      <div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.headline||'—'}</div>
+      <div style="font-size:10px;color:var(--muted);display:flex;gap:5px;margin-top:2px;flex-wrap:wrap">
+        <span>Diversity <b style="color:var(--purple)">${(divScore*100).toFixed(0)}%</b></span>
+        <span>Perf <b style="color:var(--accent)">${(perfScore*100).toFixed(0)}</b></span>
+      </div>
+      ${diffFields.length?`<div style="font-size:9px;color:var(--muted);margin-top:3px;line-height:1.5">differs: ${diffFields.map(f=>f.replace('has_','')).join(' · ')}</div>`:''}
+      <div class="ort-bar" style="margin-top:4px"><div class="ort-fill" style="width:${(combined/maxS*100).toFixed(0)}%"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function renderCovChart(coverage){
+  mc('ch-cov',{type:'doughnut',
+    data:{labels:['Covered','Unexplored'],datasets:[{data:[coverage,1-coverage],
+      backgroundColor:['#bc8cff80','#21262d'],borderColor:['#bc8cff','#30363d'],borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{...CD.plugins,legend:{display:false}}}});
+}
+
+// ── EXPLAIN CREATIVE ──────────────────────────────────────────────────────────
+async function explainCreative(cid){
+  const mBtn=document.getElementById('modal-explain-btn');
+  const mExpl=document.getElementById('modal-explain');
+  if(!_apiKey){
+    mExpl.innerHTML='<div class="explain-box" style="border-color:var(--warn)">⚠ API key not set — rebuild with GEMINI_API_KEY in .env.</div>'; return;
+  }
+  mBtn.disabled=true; mBtn.textContent='🤖 Generating…';
+  mExpl.innerHTML='<div class="explain-loading">🤖 Gemini is analysing this creative…</div>';
+  const c=CMAP[cid]; if(!c){mExpl.innerHTML='<div class="explain-box">Creative not found.</div>';return;}
+  const cml=ML.creative_ml[c.creative_id]||{};
+  const kpi=c.kpi_goal;
+  const fiKey=kpi?`kpi_${kpi}`:'perf_score';
+
+  // KPI-specific feature importance (what the model uses globally for this KPI)
+  const topFI=(ML.feature_importance[fiKey]||ML.feature_importance['perf_score']||[]).slice(0,8).map((f,i)=>{
+    const nm=f.name.replace(/_enc$/,'').replace(/_/g,' ');
+    return `  ${i+1}. ${nm} (${(f.importance*100).toFixed(1)}% importance)`;
+  }).join('\n');
+
+  // Per-creative SHAP values — which features pushed THIS creative's score up or down
+  const shapData=(ML.creative_shap||{})[String(cid)];
+  const shapLines = shapData && shapData.top
+    ? shapData.top.slice(0,8).map(f=>{
+        const nm=f.name.replace(/_enc$/,'').replace(/_/g,' ');
+        const dir=f.shap>=0?'▲ boosts score':'▼ hurts score';
+        const mag=Math.abs(f.shap).toFixed(4);
+        return `  - ${nm}: ${dir} (SHAP contribution: ${f.shap>0?'+':''}${f.shap.toFixed(4)})`;
+      }).join('\n')
+    : '  (per-creative SHAP data not available for this creative)';
+
+  const kpiM=KPI_METRIC[kpi], kpiVal=kpiM?kpiFmt(kpi,c[kpiM])+' '+KPI_LABEL[kpi]:'n/a';
+  const cp=ML.cluster_profiles[cml.cluster]||{};
+  const clShap=(ML.cluster_shap_profiles||{})[cml.cluster];
+  const clTopFeats=clShap?clShap.top.slice(0,3).map(f=>f.name.replace(/_enc$/,'').replace(/_/g,' ')).join(', '):'';
+
+  const systemPrompt=
+    `You are a senior mobile advertising creative strategist with deep expertise in performance marketing. ` +
+    `You have access to machine-learning feature importance data and per-creative SHAP attribution values. ` +
+    `Your job is to translate these technical signals into clear, actionable creative insight that a brand manager or creative director can act on immediately. ` +
+    `You speak plainly — no SHAP, no ML jargon in the output — but you ground every claim in the data provided. ` +
+    `You are specific, not generic. You reference the actual numbers. You end with one concrete recommendation.`;
+
+  const userMsg=
+    `CREATIVE ANALYSIS REQUEST\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `Creative #${cid} — "${c.headline||'(no headline)'}"\n` +
+    `Advertiser: ${c.advertiser_name||'?'} | App: ${c.app_name||'?'}\n\n` +
+    `PERFORMANCE RESULTS:\n` +
+    `• Status: ${c.performance_status.replace('_',' ')}\n` +
+    `• Composite performance score: ${((c.perf_score||0)*100).toFixed(0)}/100\n` +
+    `• KPI goal: ${kpi||'?'} | KPI result: ${kpiVal}\n` +
+    `• CTR: ${pct(c.overall_ctr)} | CVR: ${pct(c.overall_cvr)} | ROAS: ${sf(c.overall_roas,2)}x | IPM: ${sf(c.overall_ipm,1)}\n` +
+    `• CTR decay from launch: ${((c.ctr_decay_pct||0)*100).toFixed(1)}%\n` +
+    `• Fatigue onset: day ${c.fatigue_day||'not detected'}\n` +
+    `• Days active: ${c.total_days_active||'?'} | Total spend: $${(c.total_spend_usd||0).toFixed(0)}\n\n` +
+    `CREATIVE DNA:\n` +
+    `• Format: ${c.ad_format} | Vertical: ${c.vertical} | Theme: ${c.theme}\n` +
+    `• Tone: ${c.tone} | Hook: ${c.hook_type||'?'} | Language: ${c.language||'?'}\n` +
+    `• Duration: ${c.duration_sec>0?c.duration_sec+'s':'static (no video)'}\n` +
+    `• Age target: ${c.target_age_segment||'?'} | OS: ${c.os||'?'}\n` +
+    `• Countries: ${c.countries||'?'} (${c.n_countries??'?'} markets) | US market: ${c.has_us?'yes':'no'}\n` +
+    `• Gameplay footage: ${c.has_gameplay?'YES':'no'} | UGC style: ${c.has_ugc_style?'YES':'no'}\n` +
+    `• Price shown: ${c.has_price?'yes':'no'} | Discount badge: ${c.has_discount_badge?'yes':'no'}\n` +
+    `• Motion: ${pct(c.motion_score,0)} | Novelty: ${pct(c.novelty_score,0)} | Clutter: ${pct(c.clutter_score,0)}\n` +
+    `• Readability: ${pct(c.readability_score,0)} | Brand visibility: ${pct(c.brand_visibility_score,0)}\n` +
+    `• Copy length: ${c.copy_length_chars??'?'} characters | Faces: ${c.faces_count??'?'} | Products: ${c.product_count??'?'}\n\n` +
+    `CLUSTER PROFILE:\n` +
+    `• Cluster C${cml.cluster??'?'}: ${cp.size||0} creatives of type ${cp.top_format||'?'} / ${cp.top_theme||'?'} / ${cp.top_tone||'?'}\n` +
+    `• Cluster avg perf: ${((cp.avg_perf||0)*100).toFixed(0)}/100 | avg CTR: ${((cp.avg_ctr||0)*100).toFixed(2)}% | avg ROAS: ${(cp.avg_roas||0).toFixed(2)}x\n` +
+    (clTopFeats?`• Key cluster traits: ${clTopFeats}\n`:'')+
+    `\nWHAT DROVE THIS CREATIVE'S SCORE (per-creative attribution):\n` +
+    `The following creative attributes had the largest individual impact on this creative's predicted performance score.\n` +
+    `A "boosts score" means this attribute pushed the score above the dataset average; "hurts score" means it dragged it down.\n` +
+    shapLines+`\n\n`+
+    `WHAT THE MODEL VALUES MOST FOR ${kpi||'PERF'} CAMPAIGNS (global importance):\n`+topFI+`\n\n`+
+    `━━━━━━━━━━━━━━━━━━━━━━━━\n`+
+    `TASK: Write a 4–6 sentence analysis explaining why this creative performs the way it does.\n`+
+    `Structure your answer as follows:\n`+
+    `(1) What the performance result and decay data tell us about this creative's overall trajectory\n`+
+    `(2) Which 2–3 specific creative choices are most responsible for its performance — use the attribution data above to be precise\n`+
+    `(3) How this creative compares to others in its cluster/format/theme\n`+
+    `(4) One specific, concrete recommendation: what to A/B test, what to scale, what to change, or whether to retire it\n\n`+
+    `RULES:\n`+
+    `- Do NOT use technical terms like SHAP, Random Forest, PCA, cluster, attribution, coefficient, or model\n`+
+    `- DO reference the actual numbers (e.g. "CTR dropped 67% from launch", "only 42% brand visibility")\n`+
+    `- Be specific to THIS creative — avoid generic advice that could apply to any ad\n`+
+    `- Base every claim strictly on the data above — do not invent facts or benchmark data not provided`;
+
+  try{
+    const text=await callGemini(systemPrompt,[{role:'user',content:userMsg}],8000);
+    mBtn.textContent='🤖 Deep AI Explain'; mBtn.disabled=false;
+    mExpl.innerHTML=`<div class="explain-box">${markdownToHtml(text)}</div>`;
+  }catch(err){
+    mBtn.textContent='🤖 Deep AI Explain'; mBtn.disabled=false;
+    mExpl.innerHTML=`<div class="explain-box" style="border-color:var(--danger)">⚠ Error: ${err.message}</div>`;
+  }
+}
+
+// ── PREDICT CREATIVE ──────────────────────────────────────────────────────────
+async function explainPrediction(){
+  const p=window._lastPrediction;
+  if(!p) return;
+  const btn=document.getElementById('pred-explain-btn');
+  const res=document.getElementById('pred-explain-result');
+  btn.disabled=true; btn.textContent='\u23F3 Analysing\u2026';
+  const autoStr=p.autoFields.length
+    ? p.autoFields.map(f=>'  - '+f.field+': '+f.value+' (auto-selected as best for '+p.kpi+')').join('\n')
+    : '  None \u2014 all fields were manually specified.';
+  const systemPrompt=
+    'You are a senior mobile advertising creative strategist. '+
+    'A user configured a hypothetical ad creative and wants to understand why the system predicts the performance it does. '+
+    'Explain in plain English with zero ML jargon. Ground every claim in the specific attributes provided. '+
+    'Be specific, concrete, and actionable. Avoid generic advice.';
+  const userMsg=
+    'PREDICTED CREATIVE SPEC\n'+
+    '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n'+
+    'Format: '+p.fmt+' | Vertical: '+p.vert+' | Theme: '+p.theme+'\n'+
+    'Tone: '+p.tone+' | OS: '+p.osTarget+' | KPI Goal: '+p.kpi+'\n'+
+    'Duration: '+p.dur+'s | Text density: '+(p.td*100).toFixed(0)+'%\n'+
+    'Has gameplay: '+(p.hasGP?'yes':'no')+' | UGC style: '+(p.hasUGC?'yes':'no')+'\n'+
+    'Shows price: '+(p.hasPrice?'yes':'no')+' | Discount badge: '+(p.hasBadge?'yes':'no')+'\n\n'+
+    'AUTO-SELECTED FIELDS (platform chose these to maximise '+p.kpi+'):\n'+autoStr+'\n\n'+
+    'PREDICTED RESULTS:\n'+
+    '\u2022 Composite performance score: '+(p.score*100).toFixed(0)+'/100 \u2014 '+p.band+'\n'+
+    '\u2022 Expected CTR: '+(p.avgCTR*100).toFixed(2)+'%\n'+
+    '\u2022 Expected ROAS: '+p.avgROAS.toFixed(2)+'x\n'+
+    '\u2022 Expected IPM: '+p.avgIPM.toFixed(1)+'\n'+
+    '\u2022 Expected CPA: $'+p.avgCPA.toFixed(2)+'\n'+
+    '\u2022 Based on '+p.base+' similar creatives \u2014 best cluster: C'+(p.bestCluster||'?')+'\n\n'+
+    'TASK: Write a 4\u20135 sentence explanation covering:\n'+
+    '(1) Why this specific combination of format/theme/tone/flags is predicted to perform this way for a '+p.kpi+' campaign\n'+
+    '(2) What the auto-selected fields contribute (if any were auto-selected)\n'+
+    '(3) The single biggest lever the user could change to improve '+p.kpi+' further\n\n'+
+    'RULES:\n'+
+    '- No ML jargon (no "cluster", "model", "feature importance", "algorithm", "PCA")\n'+
+    '- Reference the actual numbers and creative attributes above\n'+
+    '- Be specific to this configuration \u2014 avoid advice that applies to any ad';
+  try{
+    const text=await callGemini(systemPrompt,[{role:'user',content:userMsg}],4000);
+    btn.disabled=false; btn.textContent='\uD83E\uDD16 Explain this prediction with AI';
+    res.innerHTML='<div class="explain-box">'+markdownToHtml(text)+'</div>';
+  }catch(err){
+    btn.disabled=false; btn.textContent='\uD83E\uDD16 Explain this prediction with AI';
+    res.innerHTML='<div class="explain-box" style="border-color:var(--danger)">\u26A0 Error: '+err.message+'</div>';
+  }
+}
+
+function predictNewCreative(){
+  let fmt=document.getElementById('pred-format').value;
+  const vert=document.getElementById('pred-vertical').value;
+  let theme=document.getElementById('pred-theme').value;
+  let tone=document.getElementById('pred-tone').value;
+  const kpi=document.getElementById('pred-kpi').value;
+  let osTarget=document.getElementById('pred-os').value;
+  const dur=parseFloat(document.getElementById('pred-duration').value)||30;
+  const td=parseFloat(document.getElementById('pred-textdensity').value)||0.4;
+  const hasGP=document.getElementById('pred-gameplay').checked;
+  const hasUGC=document.getElementById('pred-ugc').checked;
+  const hasPrice=document.getElementById('pred-price').checked;
+  const hasBadge=document.getElementById('pred-badge').checked;
+
+  // --- Auto-resolve blank fields: find best value by avg perf_score ---
+  const autoFields=[];
+  const baseForAuto=C.filter(c=>c.vertical===vert&&c.kpi_goal===kpi).length
+    ? C.filter(c=>c.vertical===vert&&c.kpi_goal===kpi)
+    : C;
+  function bestValFor(field,pool){
+    const agg={};
+    pool.forEach(c=>{const v=c[field];if(v==null||v==='')return;if(!agg[v]){agg[v]={sum:0,n:0};}agg[v].sum+=(c.perf_score||0);agg[v].n++;});
+    let best=null,bestAvg=-1;
+    for(const [v,d] of Object.entries(agg)){const avg=d.sum/d.n;if(avg>bestAvg){bestAvg=avg;best=v;}}
+    return best;
+  }
+  if(!fmt){
+    const v=bestValFor('ad_format',baseForAuto)||'rewarded_video';
+    fmt=v; autoFields.push({field:'Ad Format',value:v});
+  }
+  if(!theme){
+    const pool2=baseForAuto.filter(c=>c.ad_format===fmt);
+    const v=bestValFor('theme',pool2.length?pool2:baseForAuto)||'gameplay';
+    theme=v; autoFields.push({field:'Theme',value:v});
+  }
+  if(!tone){
+    const pool3=baseForAuto.filter(c=>c.ad_format===fmt&&c.theme===theme);
+    const v=bestValFor('tone',pool3.length?pool3:baseForAuto)||'excited';
+    tone=v; autoFields.push({field:'Tone',value:v});
+  }
+  if(!osTarget){
+    const v=bestValFor('os',baseForAuto)||'Both';
+    osTarget=v; autoFields.push({field:'OS Target',value:v});
+  }
+
+  // --- Cluster matching & score ---
+  const matches=C.filter(c=>c.ad_format===fmt&&c.vertical===vert&&c.theme===theme&&c.kpi_goal===kpi);
+  const pool=matches.length?matches:C.filter(c=>c.ad_format===fmt&&c.vertical===vert&&c.kpi_goal===kpi);
+  const wider=pool.length?pool:C.filter(c=>c.ad_format===fmt&&c.kpi_goal===kpi);
+  const base=wider.length?wider:C;
+
+  const clusterCounts={};
+  base.forEach(c=>{const cl=(ML.creative_ml[c.creative_id]||{}).cluster;if(cl!=null)clusterCounts[cl]=(clusterCounts[cl]||0)+1;});
+  const bestCluster=Object.entries(clusterCounts).sort((a,b)=>b[1]-a[1])[0]?.[0];
+  const cp=bestCluster?ML.cluster_profiles[bestCluster]||{}:{};
+
+  let score=cp.avg_perf||0.5;
+  const fi=ML.feature_importance['kpi_'+kpi]||ML.feature_importance['perf_score']||[];
+  const adj=(name,val)=>{const f=fi.find(x=>x.name.replace(/_enc$/,'')===name);if(!f)return;score+=f.importance*(val-0.5)*0.4;};
+  if(hasGP) adj('has_gameplay',1); else adj('has_gameplay',0);
+  if(hasUGC) adj('has_ugc_style',1); else adj('has_ugc_style',0);
+  if(hasPrice) adj('has_price',1); else adj('has_price',0);
+  if(hasBadge) adj('has_discount_badge',1); else adj('has_discount_badge',0);
+  adj('duration_sec',Math.min(1,dur/120));
+  adj('text_density',td);
+  score=Math.max(0.05,Math.min(0.98,score));
+
+  const pct100=(score*100).toFixed(0);
+  let band,bandColor;
+  if(score>=0.65){band='Top Performer territory';bandColor='var(--top)';}
+  else if(score>=0.5){band='Stable / Above average';bandColor='var(--stable)';}
+  else if(score>=0.35){band='Needs optimisation';bandColor='var(--warn)';}
+  else{band='High risk of underperformance';bandColor='var(--danger)';}
+
+  // --- Secondary metrics from base pool ---
+  const avgCTR=base.reduce((s,c)=>s+(c.overall_ctr||0),0)/base.length;
+  const avgROAS=base.reduce((s,c)=>s+(c.overall_roas||0),0)/base.length;
+  const avgIPM=base.reduce((s,c)=>s+(c.overall_ipm||0),0)/base.length;
+  const cpaBases=base.filter(c=>(c.overall_cpa||0)>0);
+  const avgCPA=cpaBases.length?cpaBases.reduce((s,c)=>s+(c.overall_cpa||0),0)/cpaBases.length:0;
+
+  const KPI_PRIMARY_VAL={CTR:(avgCTR*100).toFixed(2)+'%',ROAS:avgROAS.toFixed(2)+'x',IPM:avgIPM.toFixed(1),CPA:'$'+avgCPA.toFixed(2)};
+  const KPI_PRIMARY_LBL={CTR:'CTR',ROAS:'ROAS',IPM:'IPM',CPA:'CPA'};
+  const KPI_PRIMARY_DESC={CTR:'click-through rate',ROAS:'return on ad spend',IPM:'installs per mille',CPA:'cost per acquisition'};
+  const KPI_PRIMARY_COLOR={CTR:'var(--accent)',ROAS:'var(--purple)',IPM:'var(--top)',CPA:'var(--accent2)'};
+  const primaryVal=KPI_PRIMARY_VAL[kpi]||pct100;
+  const primaryColor=KPI_PRIMARY_COLOR[kpi]||bandColor;
+  const primaryDesc=KPI_PRIMARY_DESC[kpi]||'performance score';
+  const cpaSuffix=kpi==='CPA'?' \u2014 lower is better':'';
+
+  const secMetrics=[
+    {label:'Perf Score',val:pct100+'/100',color:bandColor},
+    kpi!=='CTR'&&{label:'CTR',val:(avgCTR*100).toFixed(2)+'%',color:'var(--accent)'},
+    kpi!=='ROAS'&&{label:'ROAS',val:avgROAS.toFixed(2)+'x',color:'var(--purple)'},
+    kpi!=='IPM'&&{label:'IPM',val:avgIPM.toFixed(1),color:'var(--top)'},
+    kpi!=='CPA'&&{label:'CPA',val:'$'+avgCPA.toFixed(2),color:'var(--accent2)'},
+  ].filter(Boolean);
+
+  // --- Auto recommendations banner ---
+  const autoHTML=autoFields.length?`
+    <div style="background:linear-gradient(135deg,rgba(99,102,241,0.12),rgba(139,92,246,0.12));border:1px solid rgba(99,102,241,0.35);border-radius:10px;padding:12px 16px;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:var(--purple);margin-bottom:8px">\u2728 Recommended values to maximise ${kpi}:</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${autoFields.map(f=>`<div style="background:var(--surface2);border-radius:6px;padding:5px 12px;font-size:11px"><span style="color:var(--muted)">${f.field}:</span> <strong style="color:var(--accent)">${f.value}</strong></div>`).join('')}
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:8px">Set these values in the form above to get the best predicted outcome for your ${kpi} goal.</div>
+    </div>`:'';
+
+  // Store for AI explain
+  window._lastPrediction={fmt,vert,theme,tone,kpi,osTarget,dur,td,hasGP,hasUGC,hasPrice,hasBadge,score,band,autoFields,avgCTR,avgROAS,avgIPM,avgCPA,bestCluster,base:base.length};
+
+  const similar=[...base].sort((a,b)=>{
+    const aGP=a.has_gameplay===hasGP?1:0,bGP=b.has_gameplay===hasGP?1:0;
+    const aU=a.has_ugc_style===hasUGC?1:0,bU=b.has_ugc_style===hasUGC?1:0;
+    return (bGP+bU)-(aGP+aU)||(b.perf_score||0)-(a.perf_score||0);
+  }).slice(0,3);
+
+  document.getElementById('pred-result').innerHTML=`
+    <div class="pred-result">
+      ${autoHTML}
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Expected ${primaryDesc} for your ${kpi} goal</div>
+      <div style="font-size:56px;font-weight:800;color:${primaryColor};line-height:1;margin-bottom:2px">${primaryVal}</div>
+      <div style="font-size:13px;font-weight:600;color:${primaryColor};margin-bottom:8px">${KPI_PRIMARY_LBL[kpi]}${cpaSuffix}</div>
+      <div class="pred-band" style="color:${bandColor};margin-bottom:14px">${band}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px;margin-bottom:14px">
+        ${secMetrics.map(m=>`<div style="background:var(--surface2);border-radius:8px;padding:9px 8px;text-align:center">
+          <div style="font-size:15px;font-weight:700;color:${m.color}">${m.val}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">${m.label}</div>
+        </div>`).join('')}
+      </div>
+      <div class="pred-badges" style="margin-bottom:12px">
+        <span class="badge ${score>=0.65?'top_performer':score>=0.5?'stable':'underperformer'}">${score>=0.65?'top performer':score>=0.5?'stable':'underperformer'}</span>
+        ${bestCluster?'<span class="kpi-badge">Cluster C'+bestCluster+'</span>':''}
+        <span class="kpi-badge">${kpi}</span>
+      </div>
+      <div class="pred-reasoning">
+        Best matching cluster: C${bestCluster||'?'} (${cp.top_format||fmt} / ${cp.top_theme||theme} / ${cp.top_tone||tone}).
+        Based on ${base.length} similar creatives.
+        ${hasGP?'Gameplay footage is a strong positive for '+kpi+' campaigns. ':''}
+        ${hasUGC?'UGC style tends to lift CTR. ':''}
+        ${td>0.6?'High text density may hurt visual clarity. ':''}
+        ${dur>60?'Long duration works best with compelling narratives. ':''}
+      </div>
+      <button onclick="explainPrediction()" id="pred-explain-btn" style="margin-top:14px;width:100%;background:linear-gradient(135deg,var(--purple),var(--accent));color:#fff;border:none;border-radius:8px;padding:11px 20px;font-size:13px;font-weight:700;cursor:pointer">\uD83E\uDD16 Explain this prediction with AI</button>
+      <div id="pred-explain-result" style="margin-top:10px"></div>
+    </div>`;
+
+  document.getElementById('pred-similar').innerHTML=similar.map(c=>`
+    <div style="display:flex;align-items:center;gap:9px;background:var(--surface2);border-radius:7px;padding:8px 10px;cursor:pointer" onclick="openModal(${c.creative_id})">
+      <img src="${c.asset_file||''}" style="width:48px;height:36px;object-fit:cover;border-radius:4px;background:var(--border)" onerror="this.style.display='none'"/>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.headline||'\u2014'}</div>
+        <div style="font-size:10px;color:var(--muted)">#${c.creative_id} \u00B7 ${c.ad_format} \u00B7 ${((c.perf_score||0)*100).toFixed(0)}/100 \u00B7 C${(ML.creative_ml[c.creative_id]||{}).cluster??'?'}</div>
+      </div>
+      <span class="badge ${c.performance_status}">${c.performance_status.replace('_',' ')}</span>
+    </div>`).join('');
+}
+
+// ── CHATBOT ───────────────────────────────────────────────────────────────────
+const CHAT_SYSTEM=`You are the Smadex Creative Copilot assistant — a deeply knowledgeable, practical advisor embedded inside a mobile advertising analytics dashboard built for creative strategists, media buyers, and marketing managers. You speak like a senior performance marketing consultant: precise, always translating technical findings into clear creative and business direction, and relentlessly actionable.
+
+━━━ DATASET ━━━
+• 1,080 mobile ad creatives across 80 campaigns, multiple advertisers
+• Verticals: gaming, e-commerce, fintech, travel, health, entertainment
+• 4 KPI goal types, each with its own Random Forest + XGBoost model and feature importance ranking
+• Daily CTR time series per creative for fatigue detection
+
+━━━ PERFORMANCE METRICS ━━━
+• CTR (click-through rate) = clicks ÷ impressions. Typical: 0.8–2.5%. Strong: >2%.
+• CVR (conversion rate) = conversions ÷ clicks. Typical: 10–40%.
+• CPA (cost per acquisition) = spend ÷ conversions. LOWER IS BETTER. Dataset: ~$1.7–$35, median ~$13.
+• ROAS (return on ad spend) = revenue ÷ spend. >1.0 = profitable, >2.0 = strong.
+• IPM (installs per mille) = conversions ÷ impressions × 1000. Typical: 3–15.
+• perf_score = composite 0–1 score (weighted CTR, CVR, ROAS, IPM). CTR has highest weight (r=0.82 correlation). 1.0 = best in dataset.
+
+━━━ PERFORMANCE STATUS LABELS ━━━
+• top_performer (perf_score > 0.65): Excellent across KPI metrics, CTR holds well over time. Action: Scale budget, create A/B variants.
+• stable: Consistent, no strong fatigue signal. Action: Monitor, consider iterating on the concept.
+• fatigued: Clear CTR decay detected past fatigue_day. Audiences overexposed. Action: Pause immediately or refresh creative. Do NOT increase spend.
+• underperformer (perf_score < 0.35): Consistently weak from launch. Action: Reallocate budget, retire or fundamentally rethink the creative.
+
+━━━ FATIGUE & DECAY ━━━
+• ctr_decay_pct = (last_7d_ctr − first_7d_ctr) / first_7d_ctr. Always negative for real ads. −0.67 = 67% drop.
+• fatigue_day = day number since launch when significant decay began.
+• Normalized CTR retention benchmarks (100% = launch week): top_performer retains ~33%, stable ~23%, fatigued only ~16%.
+• All digital ads decay — the question is how fast and how far. The normalized view makes this comparable across creatives.
+
+━━━ CREATIVE ATTRIBUTES ━━━
+Numeric (11): duration_sec, copy_length_chars (~12–117 chars), product_count, faces_count, text_density (0–1, fraction of visual area covered by text), readability_score (0–1, higher = clearer), brand_visibility_score (0–1), clutter_score (0–1, higher = more crowded/harder to process), novelty_score (0–1, visual distinctiveness vs dataset avg), motion_score (0–1, animation intensity), n_countries (number of target markets).
+Categorical (8): ad_format, vertical, theme (gameplay/discount/testimonial/ugc/feature-focus/fantasy/reward/trust/urgency/minimalist), tone (excited/playful/urgent/trustworthy/premium/calm/adventurous), os, language (en/es/de/fr/it/pt/ja), target_age_segment (18-24/25-34/35-44/45-54), hook_type (challenge/last-minute deal/story/before-after/competition/cashback…).
+Binary flags (5): has_gameplay (1 if gameplay footage shown — top CVR predictor for CPA/IPM), has_ugc_style (1 if creator/selfie aesthetic — lifts CTR), has_price (1 if price shown — purchase intent signal), has_discount_badge (1 if sale/bonus badge — urgency driver), has_us (1 if US is in target countries).
+
+━━━ AD FORMATS ━━━
+• rewarded_video: user opts in for in-app reward — highest engagement & CVR, resistant to ad blindness
+• interstitial: full-screen between content — high reach, must grab in first 2s
+• playable: interactive mini-game preview — best for gaming installs, highest IPM potential
+• banner: persistent, low-engagement — primarily awareness
+• native: blends with content feed — less disruptive, higher trust signals
+
+━━━ ML PIPELINE ━━━
+1. Feature matrix: 24 features (ONLY pre-campaign attributes — no outcome data used as inputs, zero data leakage)
+2. PCA (numpy SVD): compressed to 10–15 orthogonal components. Used for clustering and Portfolio Optimizer.
+3. K-Means++ (k=8): 8 creative archetypes discovered by grouping similar PCA vectors (C1–C8).
+4. Random Forest (80 trees): global feature importance via variance-gain; 5-fold cross-validation gives R² score.
+5. XGBoost: one model per KPI type for KPI-specific feature importance rankings.
+6. SHAP (TreeExplainer): per-creative Shapley values (which features pushed this specific creative's score up/down) AND per-cluster profiles (which features distinguish each cluster from all others).
+7. R² interpretation: >0.5 is good for noisy creative data; 1.0 = perfect prediction; 0.0 = no better than always guessing the average.
+8. Diversity score (Portfolio Optimizer): weighted distance to the closest portfolio creative. 65% categorical (format, vertical, theme, tone, KPI goal, OS, has_gameplay, has_ugc_style) + 35% PCA cosine distance in top-6 PCs (variance-weighted). Score = distance to the most similar thing you already run. 100% = completely unlike your portfolio; 0% = clone.
+
+━━━ DASHBOARD TABS (8 total) ━━━
+🔍 Performance Explorer: Browse, filter, and sort all 1,080 creatives. Filters: advertiser, vertical, format, status, KPI goal, cluster, keyword search. The distribution chart always reflects the active sort metric. Click any creative card → full detail modal with all attributes + the 🤖 Deep AI Explain button.
+
+📉 Fatigue Detection: CTR over-time line chart for any creative. Switch between Absolute CTR and Normalized (% of launch week) views. The normalized view is the key diagnostic — top performers stay well above the fatigue benchmark line. Top 15 most fatigued table + status breakdown pie chart.
+
+🎯 Recommendations: Action board — every creative tagged Scale / Monitor / Pause, KPI-aware. Filter by KPI goal, advertiser, vertical, or action type. Click any row → modal.
+
+💡 ML Insights — 3 sub-tabs:
+  • Feature Importance: bar chart of which creative attributes most predict each KPI (8 available targets). Gemini writes a grounded plain-English interpretation. Cached per metric per session.
+  • Performance Patterns: avg metric by theme, format, hook type, and tone. Filter by KPI and vertical.
+  • Winning DNA: most common attributes among top performers — the "ideal creative blueprint" for any filter combination. Shows best format, theme, hook, tone, color, UGC%, gameplay%, novelty avg.
+
+🔵 Clusters: 8 creative archetypes (C1–C8). Each card shows format/theme/tone profile, n, avg perf/CTR/ROAS, and SHAP-derived distinguishing signals (▲/▼ relative to dataset average). 🤖 Explain This Cluster → Gemini describes the archetype in plain marketing language (no jargon). Browse cluster creatives via the dropdown.
+
+🧮 Portfolio Optimizer: Add your currently running creatives (Step 1 — search by ID/headline). Step 2 ranks all candidates by a combined score: (1−α)×perf_score + α×diversity_score. Diversity = weighted distance to the closest portfolio creative (65% categorical attributes: format, vertical, theme, tone, KPI, OS + 35% PCA cosine distance in 6D). Strategy slider: 0% = pure performance, 100% = pure creative diversity. Coverage donut shows how many of the 8 K-Means creative archetypes your portfolio already covers.
+
+🔮 Predict Creative: Estimate a hypothetical new creative's performance before production. Specify format, vertical, theme, tone, OS, KPI goal, duration, text density, and boolean flags. Returns estimated perf score band, closest cluster match, adjustment rationale, and 3 comparable real creatives as benchmarks.
+
+📖 Help: Full glossary of all metrics, creative attributes, ML concepts, and AI features.
+
+━━━ AI FEATURES ━━━
+• 🤖 Deep AI Explain (creative modal): Gemini receives full creative attributes, all performance metrics, per-creative SHAP values (which specific features drove THIS creative's score up or down), cluster profile, and KPI-specific feature importance. Returns 4–6 sentences: why the creative performs as it does + one concrete recommendation.
+• 💡 Feature Importance Interpretation (ML Insights): Gemini receives the ranked feature list with importance percentages and feature definitions. Explains which creative choices matter most for the selected KPI and why. Cached per metric.
+• 🔵 Cluster Explanation: Gemini receives cluster stats + SHAP distinguishing signals. Returns a marketer-friendly archetype description with a descriptive name, creative DNA, and when to use/avoid it. No technical jargon — strict enforcement.
+• 💬 Ask Gemini (this chatbot): Full conversation memory + this complete dashboard context. Can answer anything about metrics, creative strategy, how to use the dashboard, mobile advertising best practices, and ML concepts.
+
+━━━ HOW TO ANSWER ━━━
+• Metric questions → definition + typical range + what action it implies for a creative team
+• "How do I use X tab?" → step-by-step practical walkthrough
+• Creative strategy questions → draw on dataset norms (CTR benchmarks, format comparisons, cluster insights, feature importance findings) to give specific, grounded advice
+• Questions about specific creatives or clusters → remind user they can click into the dashboard; you don't have live access to individual creative rows but can explain how to interpret what they're seeing
+• Always use plain English. Translate any ML term before using it. Be concise but complete. Never guess — if something is outside the dataset context, say so clearly.`;
+
+
+let chatHistory=[];
+
+function toggleChat(){
+  const panel=document.getElementById('chat-panel');
+  panel.classList.toggle('open');
+  if(panel.classList.contains('open')&&chatHistory.length===0){
+    appendChatMsg('assistant',"Hey! I'm Gemini \u2014 I'm here to help you get the most out of your creative data \ud83d\ude80\n\nAsk me anything: performance metrics, what makes a top performer, how the ML works, or how to use any tab. Where would you like to start?");
+  }
+}
+
+function appendChatMsg(role,text){
+  const el=document.createElement('div');
+  el.className='chat-msg '+role;
+  el.innerHTML=role==='assistant'?'<span>'+markdownToHtml(text)+'</span>':text;
+  const msgs=document.getElementById('chat-messages');
+  msgs.appendChild(el); msgs.scrollTop=msgs.scrollHeight;
+}
+
+async function sendChat(){
+  const inp=document.getElementById('chat-input');
+  const q=inp.value.trim(); if(!q)return;
+  inp.value='';
+  appendChatMsg('user',q);
+  chatHistory.push({role:'user',content:q});
+  const sendBtn=document.querySelector('.chat-send'); if(sendBtn)sendBtn.disabled=true;
+  const thinking=document.createElement('div');
+  thinking.className='chat-msg assistant thinking'; thinking.textContent='🤖 Thinking…';
+  const msgs=document.getElementById('chat-messages'); msgs.appendChild(thinking); msgs.scrollTop=msgs.scrollHeight;
+  if(!_apiKey){
+    msgs.removeChild(thinking);
+    appendChatMsg('assistant','⚠ AI features require a Gemini API key. Set GEMINI_API_KEY in .env and rebuild.');
+    if(sendBtn)sendBtn.disabled=false; return;
+  }
+  try{
+    const text=await callGemini(CHAT_SYSTEM,chatHistory,10000);
+    msgs.removeChild(thinking);
+    chatHistory.push({role:'assistant',content:text});
+    appendChatMsg('assistant',text);
+  }catch(err){
+    msgs.removeChild(thinking);
+    appendChatMsg('assistant','⚠ Error: '+err.message);
+  }
+  if(sendBtn)sendBtn.disabled=false;
+}
+
+
+// ── AI Smart Fill ─────────────────────────────────────────────────────────
+async function aiSmartFill(){
+  const btn=document.getElementById('smart-fill-btn');
+  const out=document.getElementById('smart-fill-result');
+  if(!_apiKey){out.innerHTML='<span style="color:var(--warn)">⚠ API key required for Smart Fill.</span>';return;}
+  btn.disabled=true; btn.textContent='✨ Thinking…';
+  out.textContent='';
+  // Collect what the user has already set
+  const kpi=document.getElementById('pred-kpi').value;
+  const fmt=document.getElementById('pred-format').value;
+  const vert=document.getElementById('pred-vertical').value;
+  const theme=document.getElementById('pred-theme').value;
+  const tone=document.getElementById('pred-tone').value;
+  const os=document.getElementById('pred-os').value;
+  const dur=document.getElementById('pred-duration').value;
+  const td=document.getElementById('pred-textdensity').value;
+  const gameplay=document.getElementById('pred-gameplay').checked;
+  const ugc=document.getElementById('pred-ugc').checked;
+  const price=document.getElementById('pred-price').checked;
+  const badge=document.getElementById('pred-badge').checked;
+
+  const sys=`You are a senior mobile advertising creative strategist. Given a partial creative spec, suggest optimal values for any attributes that need improvement to maximise the stated KPI goal. Use patterns from 1,080 mobile ad creatives across gaming, e-commerce, fintech, travel, health and entertainment verticals. Be specific and brief.`;
+  const msg=`KPI Goal: ${kpi}
+Current spec:
+- Format: ${fmt}
+- Vertical: ${vert}
+- Theme: ${theme}
+- Tone: ${tone}
+- OS: ${os}
+- Duration: ${dur}s
+- Text density: ${td}
+- Gameplay footage: ${gameplay}
+- UGC style: ${ugc}
+- Shows price: ${price}
+- Discount badge: ${badge}
+
+Suggest 3-5 specific improvements to maximise ${kpi} performance. For each suggestion, state what to change and why, grounded in what typically drives ${kpi}. Be concrete (e.g. "Increase duration to 20-30s for rewarded video" not just "consider adjusting duration"). Format as a brief bulleted list.`;
+
+  try{
+    const text=await callGemini(sys,[{role:'user',content:msg}],1200);
+    out.innerHTML='<div style="background:var(--surface2);border-radius:7px;padding:10px 13px;margin-top:6px;border-left:3px solid var(--accent)"><div style="font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">✨ AI Suggestions</div>'+markdownToHtml(text)+'</div>';
+  }catch(e){
+    out.innerHTML='<span style="color:var(--danger)">Error: '+e.message+'</span>';
+  }
+  btn.disabled=false; btn.textContent='✨ AI Smart Fill';
+}
+
+// ── Metric Explainability in Creative Modal ────────────────────────────────
+async function explainMetricInContext(cid,metric){
+  const c=DATA.find(x=>x.creative_id===cid); if(!c)return;
+  if(!_apiKey){alert('API key required.');return;}
+  const el=document.getElementById('metric-explain-'+metric);
+  if(!el)return;
+  if(el.dataset.loaded){el.style.display=el.style.display==='none'?'block':'none';return;}
+  el.style.display='block';
+  el.innerHTML='<em style="color:var(--muted)">Analysing…</em>';
+  const val=c[metric]!=null?(+c[metric]).toFixed(3):'n/a';
+  const kpi=c.kpi_goal||'CTR';
+  const status=c.status_label||'unknown';
+  const sys='You are a concise mobile advertising analyst. Explain in 2 sentences why a specific metric is performing as it is for a given creative. Reference the creative attributes. No jargon.';
+  const msg=`Creative: ${c.headline||'#'+cid} | KPI goal: ${kpi} | Status: ${status}
+Metric: ${metric.replace(/_/g,' ')} = ${val}
+Key attributes: format=${c.ad_format}, vertical=${c.vertical}, theme=${c.theme}, tone=${c.tone}, motion=${(+c.motion_score||0).toFixed(2)}, novelty=${(+c.novelty_score||0).toFixed(2)}, has_gameplay=${c.has_gameplay||0}, has_ugc=${c.has_ugc_style||0}
+Explain briefly why this ${metric.replace(/_/g,' ')} value (${val}) makes sense given these creative choices.`;
+  try{
+    const text=await callGemini(sys,[{role:'user',content:msg}],300);
+    el.innerHTML='<span style="color:var(--text)">'+markdownToHtml(text)+'</span>';
+    el.dataset.loaded='1';
+  }catch(e){
+    el.innerHTML='<span style="color:var(--danger)">'+e.message+'</span>';
+  }
+}
+
+
+// ── Creative Visual Preview ────────────────────────────────────────────────
+// Generates an SVG placeholder that visualises the creative's key attributes.
+// Used in the modal since actual asset files are not available in the dataset.
+function generateCreativePreview(c){
+  const status  = c.performance_status || 'stable';
+  const format  = (c.ad_format || 'unknown').replace('_',' ');
+  const theme   = c.theme   || '';
+  const tone    = c.tone    || '';
+  const color   = c.dominant_color || '#4a90e2';
+  const motion  = c.motion_score  || 0;
+  const novelty = c.novelty_score || 0;
+  const clutter = c.clutter_score || 0;
+
+  const statusColor = {
+    top_performer:'#ffd700', stable:'#58a6ff',
+    fatigued:'#f85149',      underperformer:'#d29922'
+  }[status] || '#58a6ff';
+
+  // Safe color for SVG (strip anything that isn't a valid CSS color token)
+  const safeColor = /^#[0-9a-fA-F]{3,6}$/.test(color) ? color : '#4a90e2';
+
+  // Format icon
+  const fmtIcon = {
+    'rewarded video':'🎁','interstitial':'📱','playable':'🎮',
+    'banner':'🖼️','native':'📄'
+  }[format.toLowerCase()] || '📺';
+
+  // Animated motion bars (visual intensity indicator)
+  const bars = Math.round(motion * 8);
+  const barsSvg = Array.from({length:8},(_,i)=>
+    `<rect x="${i*14+4}" y="${40-Math.min(40,(i<bars?20+i*3:6))}" width="10" height="${Math.min(40,(i<bars?20+i*3:6))}"
+     rx="3" fill="${i<bars?safeColor:'#30363d'}" opacity="${i<bars?0.9:0.3}"/>`
+  ).join('');
+
+  // Attribute pills
+  const pills = [];
+  if(c.has_gameplay)      pills.push({l:'Gameplay',   col:'#bc8cff'});
+  if(c.has_ugc_style)     pills.push({l:'UGC',        col:'#58a6ff'});
+  if(c.has_discount_badge)pills.push({l:'Discount',   col:'#f0883e'});
+  if(c.has_price)         pills.push({l:'Price',      col:'#3fb950'});
+  const pillSvg = pills.slice(0,4).map((p,i)=>`
+    <rect x="${i*68+8}" y="158" width="62" height="18" rx="9" fill="${p.col}22" stroke="${p.col}" stroke-width="1"/>
+    <text x="${i*68+39}" y="171" text-anchor="middle" font-size="9" fill="${p.col}" font-family="sans-serif">${p.l}</text>`
+  ).join('');
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="200" viewBox="0 0 660 200">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${safeColor}" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#161b22" stop-opacity="1"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="660" height="200" fill="url(#bg)"/>
+  <rect width="660" height="200" fill="#0d1117" opacity="0.55"/>
+  <!-- Status bar -->
+  <rect width="660" height="4" fill="${statusColor}" opacity="0.85"/>
+  <!-- Format badge -->
+  <rect x="16" y="16" width="120" height="26" rx="13" fill="${statusColor}22" stroke="${statusColor}" stroke-width="1.2"/>
+  <text x="76" y="33" text-anchor="middle" font-size="12" fill="${statusColor}" font-family="sans-serif" font-weight="600">${fmtIcon} ${format}</text>
+  <!-- Headline -->
+  <text x="16" y="72" font-size="15" fill="#e6edf3" font-family="sans-serif" font-weight="700">
+    ${(c.headline||'Creative #'+c.creative_id).substring(0,48).replace(/[<>&"]/g,' ')}
+  </text>
+  <text x="16" y="90" font-size="11" fill="#8b949e" font-family="sans-serif">${theme} · ${tone}</text>
+  <!-- Novelty / clutter labels -->
+  <text x="16" y="118" font-size="10" fill="#8b949e" font-family="sans-serif">Novelty</text>
+  <rect x="16" y="123" width="${Math.round(novelty*120)}" height="5" rx="2" fill="${safeColor}" opacity="0.8"/>
+  <rect x="16" y="123" width="120" height="5" rx="2" fill="#30363d"/>
+  <rect x="16" y="123" width="${Math.round(novelty*120)}" height="5" rx="2" fill="${safeColor}" opacity="0.8"/>
+  <text x="142" y="128" font-size="10" fill="${safeColor}" font-family="sans-serif">${Math.round(novelty*100)}%</text>
+  <text x="170" y="118" font-size="10" fill="#8b949e" font-family="sans-serif">Clutter</text>
+  <rect x="170" y="123" width="120" height="5" rx="2" fill="#30363d"/>
+  <rect x="170" y="123" width="${Math.round(clutter*120)}" height="5" rx="2" fill="#f85149" opacity="0.7"/>
+  <text x="296" y="128" font-size="10" fill="#f85149" font-family="sans-serif">${Math.round(clutter*100)}%</text>
+  <!-- Motion bars -->
+  <text x="490" y="24" font-size="10" fill="#8b949e" font-family="sans-serif">Motion</text>
+  <g transform="translate(490,28)">${barsSvg}</g>
+  <!-- Attribute pills -->
+  ${pillSvg}
+  <!-- Perf score -->
+  <text x="644" y="24" text-anchor="end" font-size="10" fill="#8b949e" font-family="sans-serif">Score</text>
+  <text x="644" y="42" text-anchor="end" font-size="22" fill="${statusColor}" font-family="sans-serif" font-weight="700">${Math.round((c.perf_score||0)*100)}</text>
+</svg>`;
+
+  return svg;
+}
+
+document.addEventListener('DOMContentLoaded',init);
+</script>
+
+<!-- ── CHATBOT FAB & PANEL ─────────────────────────────────────────────────── -->
+<button class="chat-fab" onclick="toggleChat()" title="Ask Gemini">💬</button>
+<div class="chat-panel" id="chat-panel">
+  <div class="chat-header">
+    <div class="dot"></div>
+    <div>
+      <span>Ask Gemini</span>
+      <div class="sub">Creative Copilot AI · Full dashboard context</div>
+    </div>
+    <button class="chat-close" onclick="toggleChat()">×</button>
+  </div>
+  <div class="chat-messages" id="chat-messages"></div>
+  <div class="chat-suggestions">
+    <span class="chat-sug" onclick="document.getElementById('chat-input').value=this.textContent;sendChat()">What is CTR decay?</span>
+    <span class="chat-sug" onclick="document.getElementById('chat-input').value=this.textContent;sendChat()">Which cluster is best for CPA?</span>
+    <span class="chat-sug" onclick="document.getElementById('chat-input').value=this.textContent;sendChat()">How does Portfolio Optimizer work?</span>
+    <span class="chat-sug" onclick="document.getElementById('chat-input').value=this.textContent;sendChat()">What makes a top performer?</span>
+  </div>
+  <div class="chat-input-row">
+    <input id="chat-input" placeholder="Ask anything about the dashboard…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"/>
+    <button class="chat-send" onclick="sendChat()">Send</button>
+  </div>
+</div>
+
+</body>
+</html>
