@@ -45,6 +45,14 @@ except ImportError:
     print("⚠  shap not found — using simplified feature attribution")
     print("   (install with: pip install shap)")
 
+try:
+    from PIL import Image
+    HAS_PIL = True
+    print("✓ Pillow found — image features will be extracted from thumbnails")
+except ImportError:
+    HAS_PIL = False
+    print("⚠  Pillow not found — skipping image features (pip install Pillow)")
+
 # ─────────────────────────────────────────────────────────────────────
 # PATHS  (relative to this script)
 # ─────────────────────────────────────────────────────────────────────
@@ -121,7 +129,111 @@ print("    " + creatives_df["performance_status"].value_counts().to_string().rep
 
 
 # ═════════════════════════════════════════════════════════════════════
-# 3.  FEATURE MATRIX  (tabular + categorical + binary; no image feats)
+# 2.  IMAGE FEATURE EXTRACTION  (PIL-based, ~12 features per thumbnail)
+# ─────────────────────────────────────────────────────────────────────
+# Lightweight visual features derived from the actual creative pixels.
+# These augment the tabular feature matrix with information no other
+# column captures: brightness, saturation, contrast, edge density,
+# colour palette diversity, warm/cool balance, left-right symmetry,
+# and a center-focus score. A CLIP/vision-model path can be plugged in
+# later to replace this block with semantic embeddings; the downstream
+# pipeline is agnostic to which method produced the features.
+# ═════════════════════════════════════════════════════════════════════
+IMG_FEATURE_NAMES = [
+    "img_brightness", "img_brightness_std",
+    "img_saturation", "img_contrast",
+    "img_edge_density", "img_color_diversity",
+    "img_warmth", "img_symmetry", "img_center_focus",
+]
+
+def _extract_image_features(image_path):
+    """Return dict of 9 visual features, or None on any failure."""
+    try:
+        with Image.open(image_path) as im:
+            im = im.convert("RGB")
+            im.thumbnail((128, 128))
+            arr = np.asarray(im, dtype=np.float32) / 255.0
+        h, w, _ = arr.shape
+        if h < 4 or w < 4:
+            return None
+        # Luminance (Rec. 709)
+        lum = 0.2126*arr[..., 0] + 0.7152*arr[..., 1] + 0.0722*arr[..., 2]
+        brightness     = float(lum.mean())
+        brightness_std = float(lum.std())
+        # Saturation (HSV-style: (max-min)/max)
+        max_c = arr.max(axis=2); min_c = arr.min(axis=2)
+        saturation = float(np.where(max_c > 1e-6, (max_c - min_c) / np.maximum(max_c, 1e-6), 0).mean())
+        # Contrast: range of luminance after smoothing extremes
+        contrast = float(np.percentile(lum, 95) - np.percentile(lum, 5))
+        # Edge density: mean abs gradient magnitude
+        gx = np.abs(np.diff(lum, axis=1)).mean()
+        gy = np.abs(np.diff(lum, axis=0)).mean()
+        edge_density = float((gx + gy) / 2)
+        # Color diversity: distinct buckets in 8x8x8 quantization, normalised
+        q = (arr * 7.999).astype(np.uint8)
+        codes = q[..., 0] * 64 + q[..., 1] * 8 + q[..., 2]
+        color_diversity = float(np.unique(codes).size / 512.0)
+        # Warmth: red+green energy vs blue (warm > cool when > 0.5)
+        warm = arr[..., 0].mean() + 0.5 * arr[..., 1].mean()
+        cool = arr[..., 2].mean()
+        warmth = float(warm / (warm + cool + 1e-6))
+        # Left-right symmetry: Pearson r of left half vs mirrored right
+        half = w // 2
+        left  = lum[:, :half]
+        right = lum[:, w - half:][:, ::-1]
+        l = left.flatten(); r = right.flatten()
+        if l.std() > 1e-6 and r.std() > 1e-6:
+            corr = float(((l - l.mean()) * (r - r.mean())).mean() / (l.std() * r.std()))
+            symmetry = max(0.0, corr)
+        else:
+            symmetry = 0.0
+        # Center focus: how much variance is concentrated in the central 50%
+        cy0, cy1 = h // 4, 3 * h // 4
+        cx0, cx1 = w // 4, 3 * w // 4
+        cv = lum[cy0:cy1, cx0:cx1].var()
+        full = lum.var() + 1e-6
+        center_focus = float(cv / full)
+        return {
+            "img_brightness":      brightness,
+            "img_brightness_std":  brightness_std,
+            "img_saturation":      saturation,
+            "img_contrast":        contrast,
+            "img_edge_density":    edge_density,
+            "img_color_diversity": color_diversity,
+            "img_warmth":          warmth,
+            "img_symmetry":        symmetry,
+            "img_center_focus":    center_focus,
+        }
+    except Exception:
+        return None
+
+
+print("\n── 2. Extracting image features from creative thumbnails ─────")
+ASSETS_DIR = BASE / "assets"
+img_rows = []
+extracted = 0
+if HAS_PIL and ASSETS_DIR.exists():
+    for cid in creatives_df["creative_id"]:
+        path = ASSETS_DIR / f"creative_{cid}.png"
+        feats = _extract_image_features(path) if path.exists() else None
+        if feats is None:
+            img_rows.append({n: np.nan for n in IMG_FEATURE_NAMES})
+        else:
+            img_rows.append(feats)
+            extracted += 1
+    print(f"  Extracted from {extracted}/{len(creatives_df)} thumbnails")
+else:
+    for _ in range(len(creatives_df)):
+        img_rows.append({n: np.nan for n in IMG_FEATURE_NAMES})
+    print("  (skipped — Pillow missing or assets/ directory not found)")
+
+img_df = pd.DataFrame(img_rows, index=creatives_df.index)
+for col in IMG_FEATURE_NAMES:
+    creatives_df[col] = img_df[col].values
+
+
+# ═════════════════════════════════════════════════════════════════════
+# 3.  FEATURE MATRIX  (tabular + categorical + binary + IMAGE features)
 # ═════════════════════════════════════════════════════════════════════
 print("\n── 3. Building feature matrix ────────────────────────────────")
 
@@ -152,8 +264,9 @@ for col in BINARY:
     if col in creatives_df.columns:
         creatives_df[col] = pd.to_numeric(creatives_df[col], errors="coerce").fillna(0)
 
-feat_cols = TABULAR + CAT_ENCODED + [c for c in BINARY if c in creatives_df.columns]
-ALL_FEAT_NAMES = feat_cols  # no image features
+IMG_COLS = [c for c in IMG_FEATURE_NAMES if c in creatives_df.columns]
+feat_cols = TABULAR + CAT_ENCODED + [c for c in BINARY if c in creatives_df.columns] + IMG_COLS
+ALL_FEAT_NAMES = feat_cols
 
 rows, valid_ids = [], []
 for _, row in creatives_df.iterrows():
@@ -173,7 +286,7 @@ X       = scaler.fit_transform(X_imp)
 
 print(f"  Feature matrix: {X.shape[0]} × {X.shape[1]}  "
       f"({len(feat_cols)} features: {len(TABULAR)} tabular + {len(CAT_ENCODED)} categorical + "
-      f"{len([c for c in BINARY if c in creatives_df.columns])} binary)")
+      f"{len([c for c in BINARY if c in creatives_df.columns])} binary + {len(IMG_COLS)} image)")
 
 
 # ═════════════════════════════════════════════════════════════════════
@@ -181,7 +294,7 @@ print(f"  Feature matrix: {X.shape[0]} × {X.shape[1]}  "
 # ═════════════════════════════════════════════════════════════════════
 print("\n── 4. PCA ────────────────────────────────────────────────────")
 
-N_PC   = min(15, X.shape[1], X.shape[0] - 1)
+N_PC   = min(18, X.shape[1], X.shape[0] - 1)
 pca    = PCA(n_components=N_PC, random_state=42)
 X_pca  = pca.fit_transform(X)
 
@@ -294,6 +407,17 @@ for k in range(8):
             for s, v in sub["performance_status"].value_counts(normalize=True).items()
         }
 
+    # Bootstrap 80 % CI for the four KPI metrics inside this cluster.
+    # Used by the dashboard predictor to display ± uncertainty bands.
+    def _ci(series):
+        v = series.dropna().astype(float).values
+        if len(v) < 3:
+            return None
+        rng = np.random.default_rng(42 + k)
+        boot = np.array([rng.choice(v, size=len(v), replace=True).mean() for _ in range(200)])
+        lo, hi = np.percentile(boot, [10, 90])
+        return [round(float(lo), 6), round(float(np.mean(v)), 6), round(float(hi), 6)]
+
     cluster_profiles[k_key] = {
         "size":       int(len(sub)),
         "avg_perf":   round(float(sub["perf_score"].mean()), 4) if "perf_score"    in sub.columns else 0,
@@ -304,6 +428,11 @@ for k in range(8):
         "top_tone":   top_val(sub["tone"]),
         "top_kpi":    top_val(sub["kpi_goal"]),
         "status_dist": status_dist,
+        "ci_perf": _ci(sub["perf_score"])    if "perf_score"    in sub.columns else None,
+        "ci_ctr":  _ci(sub["overall_ctr"])   if "overall_ctr"   in sub.columns else None,
+        "ci_roas": _ci(sub["overall_roas"])  if "overall_roas"  in sub.columns else None,
+        "ci_ipm":  _ci(sub["overall_ipm"])   if "overall_ipm"   in sub.columns else None,
+        "ci_cpa":  _ci(sub["cpa"])           if "cpa"           in sub.columns else None,
     }
     cp = cluster_profiles[k_key]
     print(f"  Cluster {k+1}: n={cp['size']:3d}  perf={cp['avg_perf']:.3f}"
@@ -313,13 +442,17 @@ for k in range(8):
 # ═════════════════════════════════════════════════════════════════════
 # 8.  PER-CREATIVE ML METADATA  (cluster id + first 10 PC scores)
 # ═════════════════════════════════════════════════════════════════════
-creative_ml: dict = {
-    cid: {
-        "cluster": int(labels[i]) + 1,   # 1-indexed (clusters 1–8)
+_img_col_idx = [feat_cols.index(c) for c in IMG_COLS] if IMG_COLS else []
+
+creative_ml: dict = {}
+for i, cid in enumerate(valid_ids):
+    entry = {
+        "cluster": int(labels[i]) + 1,
         "pc":      [round(float(v), 4) for v in X_pca[i, :10]],
     }
-    for i, cid in enumerate(valid_ids)
-}
+    if _img_col_idx:
+        entry["img_emb"] = [round(float(X[i, j]), 4) for j in _img_col_idx]
+    creative_ml[cid] = entry
 
 
 # ═════════════════════════════════════════════════════════════════════
@@ -403,7 +536,14 @@ if HAS_SHAP:
     print("  Computing SHAP values with shap.TreeExplainer (RandomForest) …")
     explainer   = shap.TreeExplainer(shap_model)
     shap_values = explainer.shap_values(X)       # (n_samples, n_features)
-    base_value  = float(explainer.expected_value)
+    # Newer shap (>=0.44) wraps single-output regression results in an extra
+    # dimension and returns expected_value as a 1-element array, while older
+    # versions return scalars / 2-D arrays. Normalise both to plain shapes.
+    sv_arr = np.asarray(shap_values)
+    if sv_arr.ndim == 3 and sv_arr.shape[-1] == 1:
+        sv_arr = sv_arr[..., 0]
+    shap_values = sv_arr
+    base_value  = float(np.asarray(explainer.expected_value).flatten()[0])
 
     for i, cid in enumerate(valid_ids):
         sv = shap_values[i]
@@ -501,6 +641,111 @@ else:
 
 
 # ═════════════════════════════════════════════════════════════════════
+# 8d-bis. CLUSTER PERSONAS  (one-shot Gemini description per cluster)
+# ─────────────────────────────────────────────────────────────────────
+# Generate a marketer-friendly archetype name + 1-line description +
+# "when to use" + "watch out for" — once at build time, cached into the
+# JSON so the dashboard ships with rich personas instead of cold IDs.
+# Skipped silently if no GEMINI_API_KEY is configured.
+# ═════════════════════════════════════════════════════════════════════
+print("\n── 8d-bis. Cluster personas (Gemini) ─────────────────────────")
+
+def _load_gemini_key():
+    env_path = BASE / ".env"
+    if not env_path.exists():
+        return ""
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line.startswith("#") or "=" not in line:
+            continue
+        name, _, value = line.partition("=")
+        if name.strip() == "GEMINI_API_KEY":
+            v = value.strip().strip('"').strip("'")
+            return v if v and v != "your-api-key-here" else ""
+    return ""
+
+cluster_personas: dict = {}
+_gem_key = _load_gemini_key()
+if _gem_key:
+    import urllib.request
+    import urllib.error
+    print("  Gemini key found — generating personas for 8 clusters…")
+
+    def _gemini_persona(cluster_id, profile, shap_top):
+        prompt_sys = (
+            "You are a senior mobile-advertising creative strategist. "
+            "Given a cluster of similar ad creatives and the attributes that "
+            "set them apart, produce a JSON object with exactly these keys:\n"
+            "  name        : a 2-4 word marketer-friendly archetype name\n"
+            "  tagline     : a single 8-15 word description\n"
+            "  when_to_use : a single 12-25 word recommendation for when to use this style\n"
+            "  watch_out   : a single 12-25 word warning about typical risks\n"
+            "Return ONLY raw JSON, no markdown fences, no commentary."
+        )
+        shap_block = ""
+        if shap_top:
+            shap_lines = [
+                f"  - {x['name']}: {'+' if x['shap']>=0 else '-'}{abs(x['shap']):.3f}"
+                for x in shap_top[:6]
+            ]
+            shap_block = "Distinguishing signals (+ = more than dataset average, - = less):\n" + "\n".join(shap_lines)
+        msg = (
+            f"Cluster C{cluster_id} — n={profile.get('size','?')} creatives\n"
+            f"Most common format: {profile.get('top_format','?')}\n"
+            f"Most common theme:  {profile.get('top_theme','?')}\n"
+            f"Most common tone:   {profile.get('top_tone','?')}\n"
+            f"Most common KPI:    {profile.get('top_kpi','?')}\n"
+            f"Average perf score: {(profile.get('avg_perf') or 0)*100:.0f}/100\n"
+            f"Average CTR:        {(profile.get('avg_ctr') or 0)*100:.2f}%\n"
+            f"Average ROAS:       {profile.get('avg_roas') or 0:.2f}x\n\n"
+            f"{shap_block}"
+        )
+        body = {
+            "system_instruction": {"parts": [{"text": prompt_sys}]},
+            "contents": [{"role": "user", "parts": [{"text": msg}]}],
+            "generationConfig": {"maxOutputTokens": 400, "temperature": 0.4,
+                                 "thinkingConfig": {"thinkingBudget": 0}},
+        }
+        # Try a couple of reliable models in order.
+        for model in ("gemini-2.5-flash", "gemini-2.0-flash-001", "gemini-1.5-flash-latest"):
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={_gem_key}"
+            req = urllib.request.Request(
+                url, data=json.dumps(body).encode("utf-8"),
+                headers={"Content-Type": "application/json"}, method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                txt = (data.get("candidates", [{}])[0]
+                           .get("content", {}).get("parts", [{}])[0]
+                           .get("text", "") or "").strip()
+                if not txt:
+                    continue
+                # Strip ```json fences if present
+                if txt.startswith("```"):
+                    txt = txt.strip("`")
+                    if txt.lower().startswith("json"):
+                        txt = txt[4:].strip()
+                obj = json.loads(txt)
+                return {k: str(obj.get(k, "")).strip() for k in ("name", "tagline", "when_to_use", "watch_out")}
+            except (urllib.error.HTTPError, urllib.error.URLError,
+                    json.JSONDecodeError, KeyError, ValueError):
+                continue
+        return None
+
+    for k_key, prof in cluster_profiles.items():
+        shap_top = (cluster_shap_profiles.get(k_key) or {}).get("top", [])
+        persona = _gemini_persona(k_key, prof, shap_top)
+        if persona:
+            cluster_personas[k_key] = persona
+            print(f"  C{k_key}: {persona.get('name','?')} — {persona.get('tagline','')[:80]}")
+        else:
+            print(f"  C{k_key}: skipped (Gemini call failed)")
+else:
+    print("  No Gemini key in .env — skipping persona generation")
+
+
+# ═════════════════════════════════════════════════════════════════════
 # 8e. EMBED MODEL PARAMETERS  (for JS new-creative predictor)
 # ═════════════════════════════════════════════════════════════════════
 print("\n── 8d. Embedding model parameters for JS predictor ──────────")
@@ -554,6 +799,10 @@ print(f"  Label encoders: {list(le_mappings.keys())}")
 
 model_params = {
     "feature_names":   ALL_FEAT_NAMES,
+    "tabular_names":   TABULAR,
+    "categorical_names": CAT_ENCODED,
+    "binary_names":    [c for c in BINARY if c in creatives_df.columns],
+    "image_names":     IMG_COLS,
     "le_mappings":     le_mappings,
     "scaler":          scaler_params,
     "imputer_medians": imputer_medians,
@@ -588,10 +837,12 @@ ml_results = {
     "feature_importance":     feature_importance,
     "cluster_profiles":       cluster_profiles,
     "cluster_shap_profiles":  cluster_shap_profiles,
+    "cluster_personas":       cluster_personas,
     "creative_ml":            creative_ml,
     "creative_shap":          creative_shap,
     "pca_explained_variance": [round(v, 4) for v in explained],
     "feature_names":          ALL_FEAT_NAMES,
+    "image_feature_names":    IMG_COLS,
     "status_ctr_retention":   status_ctr_retention,
     "cv_results":             cv_results,
     "model_params":           model_params,
@@ -599,6 +850,8 @@ ml_results = {
         "scikit-learn: PCA, KMeans, RandomForestRegressor"
         + (" | xgboost: XGBRegressor (KPI models)" if HAS_XGB else "")
         + (" | shap: TreeExplainer" if HAS_SHAP else " | simplified attribution")
+        + (" | PIL image features" if HAS_PIL else "")
+        + (f" | personas={len(cluster_personas)}" if cluster_personas else "")
     ),
 }
 

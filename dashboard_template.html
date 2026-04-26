@@ -452,10 +452,12 @@ tr:hover td{background:#ffffff05}
     </div>
     <div id="m-img" style="width:100%;height:200px;border-radius:9px;margin-bottom:12px;overflow:hidden;background:var(--surface2)"></div>
     <div class="sr" id="m-stats"></div>
+    <div id="m-lifecycle" style="margin-bottom:10px"></div>
     <div style="margin-bottom:9px">
       <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Creative Attributes</div>
       <div class="at-tags" id="m-attrs"></div>
     </div>
+    <div id="m-similar-visual" style="margin-bottom:10px"></div>
     <div style="background:var(--surface2);border-radius:7px;padding:11px;margin-bottom:10px">
       <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">AI Analysis</div>
       <div id="m-analysis" style="font-size:12px;line-height:1.65;color:var(--text)"></div>
@@ -534,7 +536,12 @@ tr:hover td{background:#ffffff05}
         <div class="fg"><label>Discount Badge <span style="color:var(--muted);font-weight:400">(optional)</span></label>
           <select id="pred-badge"><option value="">✨ Auto</option><option value="1">Yes</option><option value="0">No</option></select></div>
       </div>
-      <div style="display:flex;gap:8px;margin-top:16px"><button onclick="predictNewCreative()" style="flex:1;background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer">⚡ Predict Performance</button><button onclick="resetPredForm()" title="Reset all fields to Auto" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer">↺ Reset</button></div>
+      <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+        <button onclick="predictNewCreative()" style="flex:1;min-width:200px;background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer">⚡ Predict Performance</button>
+        <button id="smart-fill-btn" onclick="aiSmartFill()" title="Ask Gemini to suggest 3-5 specific improvements before predicting" style="background:rgba(139,92,246,0.12);color:var(--purple);border:1px solid rgba(139,92,246,0.4);border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer">✨ AI Smart Fill</button>
+        <button onclick="resetPredForm()" title="Reset all fields to Auto" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer">↺ Reset</button>
+      </div>
+      <div id="smart-fill-result" style="margin-top:8px"></div>
       <div id="pred-result"></div>
     </div>
     <div class="card">
@@ -1075,12 +1082,97 @@ function openModal(cid){
     ['Gameplay',c.has_gameplay?'✓':'✗'],['UGC',c.has_ugc_style?'✓':'✗'],['US market',c.has_us?'✓':'✗'],
   ].map(([l,v])=>`<span class="at">${l}: <span>${v}</span></span>`).join('');
   document.getElementById('m-analysis').innerHTML=genAnalysis(c,cml);
+  document.getElementById('m-lifecycle').innerHTML=_renderLifecycleSparkline(cid,c);
+  document.getElementById('m-similar-visual').innerHTML=_renderVisualSimilar(cid,cml);
   // Reset explain button and output for this creative
   const mBtn=document.getElementById('modal-explain-btn');
   const mExpl=document.getElementById('modal-explain');
   mBtn.dataset.cid=cid; mBtn.textContent='🤖 Deep AI Explain'; mBtn.disabled=false;
   mExpl.innerHTML='';
   document.getElementById('modal').classList.add('open');
+}
+
+// ── LIFECYCLE SPARKLINE ───────────────────────────────────────────────────────
+// Inline SVG of normalised CTR over time + retire/replace recommendation if
+// the creative's status is "fatigued". Uses APP_DATA.ts (per-creative daily series).
+function _renderLifecycleSparkline(cid,c){
+  const ts=(APP_DATA.ts||{})[cid]||[];
+  if(ts.length<5)return '';
+  const vals=ts.map(d=>d.ctr_norm!=null?d.ctr_norm:(d.ctr*100));
+  const labels=ts.map(d=>d.d);
+  const W=320, H=44, pad=2;
+  const mn=Math.min(...vals), mx=Math.max(...vals);
+  const range=Math.max(1,mx-mn);
+  const xStep=(W-2*pad)/Math.max(1,vals.length-1);
+  const yFor=v=>H-pad-((v-mn)/range)*(H-2*pad);
+  const pts=vals.map((v,i)=>`${pad+i*xStep},${yFor(v)}`).join(' ');
+  const fillPts=`${pad},${H-pad} `+pts+` ${pad+(vals.length-1)*xStep},${H-pad}`;
+  // Mark fatigue day
+  let fatLine='';
+  if(c.fatigue_day&&c.fatigue_day<vals.length){
+    const fx=pad+c.fatigue_day*xStep;
+    fatLine=`<line x1="${fx}" y1="0" x2="${fx}" y2="${H}" stroke="#f85149" stroke-width="1" stroke-dasharray="2,2" opacity=".55"/>
+             <text x="${fx+3}" y="9" fill="#f85149" font-size="8" font-family="system-ui">fatigue d${c.fatigue_day}</text>`;
+  }
+  const status=c.performance_status||'stable';
+  const colour=status==='top_performer'?'#3fb950':status==='fatigued'?'#f85149':status==='underperformer'?'#d29922':'#58a6ff';
+  // Retire/replace recommendation
+  let advice='';
+  if(status==='fatigued'){
+    const cml=ML.creative_ml[c.creative_id]||{};
+    const cluster=cml.cluster;
+    const replacements=C.filter(x=>x.creative_id!==c.creative_id&&(ML.creative_ml[x.creative_id]||{}).cluster===cluster&&x.performance_status==='top_performer'&&x.kpi_goal===c.kpi_goal)
+                        .sort((a,b)=>(b.perf_score||0)-(a.perf_score||0)).slice(0,2);
+    advice=`<div style="font-size:10px;color:var(--danger);margin-top:5px;font-weight:600">\u26A0 Retire & replace</div>`;
+    if(replacements.length){
+      advice+=`<div style="font-size:10px;color:var(--muted);margin-top:2px">Top performers in same cluster (C${cluster}, ${c.kpi_goal}): `
+        +replacements.map(r=>`<a onclick="event.stopPropagation();openModal(${r.creative_id})" style="color:var(--accent2);cursor:pointer;text-decoration:underline">#${r.creative_id}</a>`).join(', ')+`</div>`;
+    }
+  }
+  return `<div style="background:var(--surface2);border-radius:7px;padding:9px 11px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Lifecycle (CTR over time)</div>
+      <div style="font-size:10px;color:var(--muted)">${labels[0]||''} \u2192 ${labels[labels.length-1]||''}</div>
+    </div>
+    <svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block">
+      <polygon points="${fillPts}" fill="${colour}" opacity=".15"/>
+      <polyline points="${pts}" fill="none" stroke="${colour}" stroke-width="1.5"/>
+      ${fatLine}
+    </svg>
+    ${advice}
+  </div>`;
+}
+
+// ── VISUAL SIMILARITY (PIL image-feature embedding distance) ─────────────────
+// Uses each creative's standardised image-feature vector (img_emb) saved by
+// the pipeline. Cosine distance ranks the 3 visually closest creatives.
+function _renderVisualSimilar(cid,cml){
+  const v=cml.img_emb;
+  if(!v||!v.length)return '';
+  const cands=[];
+  for(const other of C){
+    if(other.creative_id===cid)continue;
+    const o=(ML.creative_ml[other.creative_id]||{}).img_emb;
+    if(!o||o.length!==v.length)continue;
+    let dot=0,na=0,nb=0;
+    for(let i=0;i<v.length;i++){dot+=v[i]*o[i];na+=v[i]*v[i];nb+=o[i]*o[i];}
+    const denom=Math.sqrt(na*nb)||1e-6;
+    const cos=dot/denom;
+    cands.push({other,sim:cos});
+  }
+  cands.sort((a,b)=>b.sim-a.sim);
+  const top=cands.slice(0,3);
+  if(!top.length)return '';
+  return `<div style="background:var(--surface2);border-radius:7px;padding:9px 11px">
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Visually closest creatives <span style="color:var(--purple);text-transform:none;letter-spacing:0;font-weight:600">(image-feature cosine)</span></div>
+    <div style="display:flex;gap:6px">
+      ${top.map(({other,sim})=>`<div onclick="openModal(${other.creative_id})" style="flex:1;cursor:pointer;background:var(--surface);border-radius:6px;padding:6px;border:1px solid var(--border)">
+        <img src="assets/creative_${other.creative_id}.png" style="width:100%;height:60px;object-fit:cover;border-radius:4px;background:var(--border)" onerror="this.style.display='none'"/>
+        <div style="font-size:10px;color:var(--text);margin-top:4px">#${other.creative_id}</div>
+        <div style="font-size:9px;color:var(--muted)">${other.ad_format} \u00B7 sim ${(sim*100).toFixed(0)}%</div>
+      </div>`).join('')}
+    </div>
+  </div>`;
 }
 function closeModal(){document.getElementById('modal').classList.remove('open');}
 function genAnalysis(c,cml){
@@ -1451,9 +1543,11 @@ function renderDNA(){
 // ── CLUSTERS ──────────────────────────────────────────────────────────────────
 const CLR=['#58a6ff','#3fb950','#ffa657','#bc8cff','#ffd700','#f85149','#79c0ff','#d29922'];
 function renderClusters(){
+  const personas=ML.cluster_personas||{};
   document.getElementById('cluster-cards').innerHTML=Object.entries(ML.cluster_profiles).map(([k,p])=>{
     const color = CLR[(+k-1) % CLR.length];
     const shap  = (ML.cluster_shap_profiles||{})[k];
+    const persona = personas[k]||null;
     const topFeats = shap
       ? shap.top.slice(0,3).map(f=>{
           const label = f.name.replace(/_enc$/,'').replace(/_/g,' ');
@@ -1462,9 +1556,14 @@ function renderClusters(){
           return `<span style="font-size:9px;color:${col}">${dir} ${label}</span>`;
         }).join(' · ')
       : '';
+    const statusDist=p.status_dist||{};
     return `
     <div class="cl-card" onclick="selectCluster(${k})">
-      <div style="font-size:26px;font-weight:800;color:${color}">C${k}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="font-size:26px;font-weight:800;color:${color}">C${k}</div>
+        ${persona?`<div style="font-size:10px;color:var(--purple);text-align:right;font-weight:700;line-height:1.25;max-width:65%">${persona.name||''}</div>`:''}
+      </div>
+      ${persona&&persona.tagline?`<div style="font-size:10px;color:var(--text);font-style:italic;line-height:1.4;margin:3px 0 5px;border-left:2px solid ${color};padding-left:6px">"${persona.tagline}"</div>`:''}
       <div style="font-size:12px;font-weight:600;margin:3px 0">${p.top_format}</div>
       <div style="font-size:10px;color:var(--muted)">${p.top_theme} · ${p.top_tone}</div>
       <div style="font-size:10px;color:var(--purple);margin-top:2px">KPI: ${p.top_kpi}</div>
@@ -1477,14 +1576,28 @@ function renderClusters(){
       </div>
       ${topFeats ? `<div style="margin-top:5px;font-size:9px;line-height:1.5;border-top:1px solid var(--border);padding-top:4px"><span style="color:var(--muted)">Drivers: </span>${topFeats}</div>` : ''}
       <div style="margin-top:5px;display:flex;gap:2px;flex-wrap:wrap">
-        ${Object.entries(p.status_dist).filter(([,v])=>v>0).map(([s,v])=>`<span class="badge ${s}">${v}</span>`).join('')}
+        ${Object.entries(statusDist).filter(([,v])=>v>0).map(([s,v])=>`<span class="badge ${s}">${v}</span>`).join('')}
       </div>
     </div>`;
   }).join('');
 }
 function selectCluster(k){
   document.getElementById('cl-sel').value=k; renderClusterCreatives();
+  const sel=document.getElementById('cl-explain-sel'); if(sel)sel.value=k;
   document.querySelectorAll('.cl-card').forEach(e=>e.classList.toggle('sel',e.querySelector('[style*="font-size:26px"]')?.textContent===`C${k}`));
+  // Surface the precomputed persona instantly (no Gemini round-trip needed)
+  const persona=(ML.cluster_personas||{})[k];
+  const out=document.getElementById('cl-explain-out');
+  if(persona&&out){
+    out.innerHTML=`<div class="explain-box" style="border-color:var(--purple)">
+      <div style="font-size:11px;color:var(--purple);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:4px">\u2728 Persona — generated at build time</div>
+      <div style="font-size:18px;font-weight:800;margin-bottom:4px">${persona.name||''}</div>
+      <div style="font-size:12px;font-style:italic;color:var(--muted);margin-bottom:10px">"${persona.tagline||''}"</div>
+      ${persona.when_to_use?`<div style="font-size:11px;line-height:1.6;margin-bottom:6px"><strong style="color:var(--accent2)">When to use:</strong> ${persona.when_to_use}</div>`:''}
+      ${persona.watch_out?`<div style="font-size:11px;line-height:1.6"><strong style="color:var(--warn)">Watch out for:</strong> ${persona.watch_out}</div>`:''}
+      <div style="font-size:10px;color:var(--muted);margin-top:8px">Click \uD83E\uDD16 Explain This Cluster for a longer Gemini analysis.</div>
+    </div>`;
+  }
 }
 function renderClusterCreatives(){
   const k=document.getElementById('cl-sel').value;
@@ -2015,6 +2128,185 @@ function _predBestNumeric(field,pool,kpi){
   return parseFloat(vals[Math.floor(vals.length/2)]);
 }
 
+// ── OLS MODEL INFERENCE ───────────────────────────────────────────────────────
+// Use the trained scaler + PCA + linear regression coefficients embedded in
+// ml_results.json to score a new creative directly with the model. Unspecified
+// fields are imputed from training-set medians (same as the pipeline does).
+const _MP=ML.model_params||null;
+function _runOLSPredictor(spec){
+  if(!_MP||!_MP.lr_weights||!_MP.scaler||!_MP.pca||!_MP.feature_names)return null;
+  const names=_MP.feature_names;
+  const med=_MP.imputer_medians||names.map(()=>0);
+  const mean=_MP.scaler.mean, std=_MP.scaler.std;
+  const pcaMean=_MP.pca.mean, comps=_MP.pca.components;
+  const w=_MP.lr_weights, b=_MP.lr_intercept||0;
+  // Build raw feature vector: spec value if provided, else imputer median
+  const x=names.map((n,i)=>{
+    if(spec[n]!=null&&!isNaN(+spec[n]))return +spec[n];
+    return med[i];
+  });
+  // Standardise
+  const xs=x.map((v,i)=>(v-mean[i])/(std[i]||1));
+  // PCA-center then project
+  const xc=xs.map((v,i)=>v-(pcaMean[i]||0));
+  const pcs=comps.map(row=>{let s=0;for(let i=0;i<row.length;i++)s+=row[i]*xc[i];return s;});
+  // OLS: weights are over PC scores
+  let y=b;
+  for(let i=0;i<w.length&&i<pcs.length;i++)y+=w[i]*pcs[i];
+  return Math.max(0.01,Math.min(0.99,y));
+}
+
+// Convert dashboard form spec → raw feature dict matching pipeline names
+function _specToFeatureDict(spec){
+  if(!_MP)return {};
+  const le=_MP.le_mappings||{};
+  const enc=(field,val)=>{
+    const m=le[field]; if(!m||val==null||val==='')return null;
+    return m[String(val)]??null;
+  };
+  const out={};
+  out.duration_sec     = +spec.dur||30;
+  out.text_density     = +spec.td ||0.4;
+  // Categorical encodings (use null = imputed median if unknown)
+  const eAd=enc('ad_format',spec.fmt);     if(eAd!=null)out.ad_format_enc=eAd;
+  const eVe=enc('vertical',spec.vert);     if(eVe!=null)out.vertical_enc=eVe;
+  const eTh=enc('theme',spec.theme);       if(eTh!=null)out.theme_enc=eTh;
+  const eTo=enc('tone',spec.tone);         if(eTo!=null)out.tone_enc=eTo;
+  const eOs=enc('os',spec.osTarget);       if(eOs!=null)out.os_enc=eOs;
+  const eLa=enc('language',spec.language); if(eLa!=null)out.language_enc=eLa;
+  const eHk=enc('hook_type',spec.hookType);if(eHk!=null)out.hook_type_enc=eHk;
+  const eCo=enc('dominant_color',spec.colorVal); if(eCo!=null)out.dominant_color_enc=eCo;
+  out.has_gameplay       = spec.hasGP   ?1:0;
+  out.has_ugc_style      = spec.hasUGC  ?1:0;
+  out.has_price          = spec.hasPrice?1:0;
+  out.has_discount_badge = spec.hasBadge?1:0;
+  return out;
+}
+
+// ── COUNTERFACTUAL RECOMMENDER ────────────────────────────────────────────────
+// Enumerate every single-feature swap from the current spec and re-evaluate the
+// matching pool's *KPI* (the metric the user is actually optimising — CPA, CTR,
+// ROAS, IPM). Returns the top-K levers that move the user's KPI in the better
+// direction (lower CPA, higher everything else). KPI-aware so the
+// recommendations stay consistent with both the auto-selector and the headline
+// number displayed above the levers.
+const _CF_OPTIONS={
+  fmt:['rewarded_video','interstitial','playable','banner','native'],
+  theme:['gameplay','product-focus','discount','testimonial','feature-focus','ugc','fantasy','reward','trust','urgency','minimalist'],
+  tone:['excited','playful','urgent','trustworthy','premium','calm','adventurous'],
+  osTarget:['Both','iOS','Android'],
+  language:['en','es','de','fr','it','pt','ja'],
+  hookType:['challenge','story','before-after','last-minute deal','competition','cashback','social proof','tutorial','comparison','fomo'],
+  colorVal:['blue','purple','orange','lime','black','red','white','teal','yellow','green','pink','beige'],
+  hasGP:[true,false], hasUGC:[true,false], hasPrice:[true,false], hasBadge:[true,false],
+};
+const _CF_LABELS={
+  fmt:'Format', theme:'Theme', tone:'Tone', osTarget:'OS', language:'Language',
+  hookType:'Hook', colorVal:'Color',
+  hasGP:'Gameplay footage', hasUGC:'UGC style', hasPrice:'Show price', hasBadge:'Discount badge',
+};
+function _displayVal(field,v){
+  if(typeof v==='boolean')return v?'yes':'no';
+  return v||'(unset)';
+}
+
+// Reproduce the same matching-pool fallback chain that predictNewCreative uses,
+// so that counterfactuals see the exact same set of comparable creatives.
+function _matchingPool(spec){
+  const matches=C.filter(c=>c.ad_format===spec.fmt&&c.vertical===spec.vert&&c.theme===spec.theme&&c.kpi_goal===spec.kpi);
+  const pool=matches.length?matches:C.filter(c=>c.ad_format===spec.fmt&&c.vertical===spec.vert&&c.kpi_goal===spec.kpi);
+  const wider=pool.length?pool:C.filter(c=>c.ad_format===spec.fmt&&c.kpi_goal===spec.kpi);
+  let base=wider.length?wider:C;
+  if(spec.colorVal){const cb=base.filter(c=>c.dominant_color===spec.colorVal);if(cb.length>=5)base=cb;}
+  return base;
+}
+function _kpiAvg(pool, kpi){
+  const f=_PRED_KPI_FIELD[kpi]||'overall_ctr';
+  const valid=pool.filter(c=>(c[f]||0)>0);
+  if(valid.length<3)return {avg:null,n:0};
+  return {avg:valid.reduce((s,c)=>s+c[f],0)/valid.length, n:valid.length};
+}
+function _formatKpiAbs(val, kpi){
+  if(val==null||isNaN(val))return '\u2014';
+  if(kpi==='CPA') return '$'+val.toFixed(2);
+  if(kpi==='ROAS')return val.toFixed(2)+'x';
+  if(kpi==='IPM') return val.toFixed(1);
+  return (val*100).toFixed(2)+'%'; // CTR
+}
+function _formatKpiDelta(improvement, kpi){
+  // `improvement` is always positive for the user-preferred direction.
+  if(kpi==='CPA') return '\u2212$'+improvement.toFixed(2)+' saved';
+  if(kpi==='ROAS')return '+'+improvement.toFixed(2)+'x';
+  if(kpi==='IPM') return '+'+improvement.toFixed(1);
+  return '+'+(improvement*100).toFixed(2)+'%'; // CTR
+}
+function _kpiUnitLabel(kpi){
+  return kpi==='CPA'?'lower CPA':kpi==='ROAS'?'higher ROAS':kpi==='IPM'?'higher IPM':'higher CTR';
+}
+
+function _computeKpiCounterfactuals(spec, baseAvg, kpi){
+  if(baseAvg==null||isNaN(baseAvg))return [];
+  const isLow=!!_PRED_KPI_LOW[kpi];
+  const out=[];
+  for(const field of Object.keys(_CF_OPTIONS)){
+    const current=spec[field];
+    for(const cand of _CF_OPTIONS[field]){
+      if(cand===current)continue;
+      const trial={...spec, [field]:cand};
+      const r=_kpiAvg(_matchingPool(trial), kpi);
+      if(r.avg==null||r.n<10)continue; // need ≥10 comparable creatives for a stable estimate
+      const improvement=isLow?(baseAvg-r.avg):(r.avg-baseAvg);
+      if(improvement<=0)continue;
+      out.push({field, label:_CF_LABELS[field]||field,
+                from:_displayVal(field,current), to:_displayVal(field,cand),
+                baseAvg, newAvg:r.avg, improvement, n:r.n});
+    }
+  }
+  const byField={};
+  for(const r of out){
+    if(!byField[r.field]||r.improvement>byField[r.field].improvement)byField[r.field]=r;
+  }
+  return Object.values(byField).sort((a,b)=>b.improvement-a.improvement).slice(0,5);
+}
+
+// ── UNCERTAINTY BANDS ─────────────────────────────────────────────────────────
+// Bootstrap an 80% CI on the SAME pool that produced the displayed average so
+// the band actually brackets the value the user sees (the older path used the
+// cluster-level CI, which often lived far from the pool average and looked
+// inconsistent). 200 resamples, p10/p90 endpoints.
+function _bootstrapCI(values){
+  const v=(values||[]).filter(x=>x!=null&&!isNaN(x));
+  if(v.length<3)return null;
+  const n=v.length, B=200, boots=new Array(B);
+  for(let i=0;i<B;i++){
+    let s=0;
+    for(let j=0;j<n;j++)s+=v[(Math.random()*n)|0];
+    boots[i]=s/n;
+  }
+  boots.sort((a,b)=>a-b);
+  return [boots[(B*0.10)|0], boots[(B*0.50)|0], boots[(B*0.90)|0]];
+}
+function _bootstrapBands(pool){
+  return {
+    perf:_bootstrapCI(pool.map(c=>c.perf_score)),
+    ctr: _bootstrapCI(pool.filter(c=>(c.overall_ctr||0)>0).map(c=>c.overall_ctr)),
+    roas:_bootstrapCI(pool.filter(c=>(c.overall_roas||0)>0).map(c=>c.overall_roas)),
+    ipm: _bootstrapCI(pool.filter(c=>(c.overall_ipm||0)>0).map(c=>c.overall_ipm)),
+    cpa: _bootstrapCI(pool.filter(c=>(c.cpa||0)>0).map(c=>c.cpa)),
+  };
+}
+// Legacy cluster-CI helper kept for any other caller that might still use it.
+function _uncertaintyForCluster(clusterId){
+  const cp=ML.cluster_profiles?.[String(clusterId)];
+  if(!cp)return {};
+  return {perf:cp.ci_perf, ctr:cp.ci_ctr, roas:cp.ci_roas, ipm:cp.ci_ipm, cpa:cp.ci_cpa};
+}
+function _fmtBand(ci, fmt){
+  if(!ci||ci.length<3)return '';
+  const lo=fmt(ci[0]), hi=fmt(ci[2]);
+  return `<span style="font-size:9px;color:var(--muted);font-weight:500">80% CI ${lo}\u2013${hi}</span>`;
+}
+
 async function explainPrediction(){
   const p=window._lastPrediction;
   if(!p) return;
@@ -2024,11 +2316,28 @@ async function explainPrediction(){
   const autoStr=p.autoFields.length
     ? p.autoFields.map(f=>'  - '+f.field+': '+f.value+' (auto-selected as best for '+p.kpi+')').join('\n')
     : '  None \u2014 all fields were manually specified.';
+  // ── ML grounding: pull cluster profile, KPI feature importance, top counterfactuals
+  const cpProf = (p.bestCluster && ML.cluster_profiles?.[String(p.bestCluster)]) || {};
+  const persona = (ML.cluster_personas||{})[String(p.bestCluster)];
+  const fi = ML.feature_importance?.['kpi_'+p.kpi] || ML.feature_importance?.perf_score || [];
+  const fiTop = fi.slice(0,5).map((f,i)=>`  ${i+1}. ${f.name.replace(/_enc$/,'').replace(/_/g,' ')} (${(f.importance*100).toFixed(1)}%)`).join('\n');
+  const cfStr = (p.counterfactuals||[]).map(cf=>{
+    if(cf.improvement!=null){
+      // KPI-aware lever: show the absolute new KPI value + the improvement in user-facing units
+      return `  - Switch ${cf.label} ${cf.from} \u2192 ${cf.to}: ${p.kpi} becomes ${_formatKpiAbs(cf.newAvg,p.kpi)} (${_formatKpiDelta(cf.improvement,p.kpi)} vs baseline of ${_formatKpiAbs(cf.baseAvg,p.kpi)}) — n=${cf.n} similar creatives`;
+    }
+    // legacy perf-score lever (kept for tools that may still emit `delta`)
+    return `  - Switch ${cf.label} ${cf.from} \u2192 ${cf.to}: predicted composite score ${(cf.delta>0?'+':'')}${(cf.delta*100).toFixed(1)} pts`;
+  }).join('\n') || '  (no positive single-field swap improves the KPI by enough to recommend on the available data)';
+  const olsLine = p.olsScore!=null ? `\u2022 OLS model score (PCA + linear regression on PC scores): ${(p.olsScore*100).toFixed(0)}/100\n` : '';
+
   const systemPrompt=
     'You are a senior mobile advertising creative strategist. '+
     'A user configured a hypothetical ad creative and wants to understand why the system predicts the performance it does. '+
-    'Explain in plain English with zero ML jargon. Ground every claim in the specific attributes provided. '+
-    'Be specific, concrete, and actionable. Avoid generic advice.';
+    'You have FULL ACCESS to the model\'s reasoning: cluster profile, KPI-specific feature importance ranks, '+
+    'and counterfactual deltas (what happens if a single field is swapped). '+
+    'Explain in plain English with zero ML jargon \u2014 translate every model signal into creative direction. '+
+    'Be specific, concrete, and actionable. Reference the actual numbers and counterfactuals.';
   const userMsg=
     'PREDICTED CREATIVE SPEC\n'+
     '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n'+
@@ -2040,19 +2349,25 @@ async function explainPrediction(){
     'Shows price: '+(p.hasPrice?'yes':'no')+' | Discount badge: '+(p.hasBadge?'yes':'no')+'\n\n'+
     'AUTO-SELECTED FIELDS (platform chose these to maximise '+p.kpi+'):\n'+autoStr+'\n\n'+
     'PREDICTED RESULTS:\n'+
-    '\u2022 Composite performance score: '+(p.score*100).toFixed(0)+'/100 \u2014 '+p.band+'\n'+
+    '\u2022 Composite performance score: '+(p.score*100).toFixed(0)+'/100 \u2014 '+p.band+'\n'+olsLine+
     '\u2022 Expected CTR: '+(p.avgCTR*100).toFixed(2)+'%\n'+
     '\u2022 Expected ROAS: '+p.avgROAS.toFixed(2)+'x\n'+
     '\u2022 Expected IPM: '+p.avgIPM.toFixed(1)+'\n'+
     '\u2022 Expected CPA: '+(p.avgCPA!=null?'$'+p.avgCPA.toFixed(2)+' (lower is better)':'N/A')+'\n'+
-    '\u2022 Based on '+p.base+' similar creatives \u2014 best cluster: C'+(p.bestCluster||'?')+'\n\n'+
-    'TASK: Write a 4\u20135 sentence explanation covering:\n'+
-    '(1) Why this specific combination of format/theme/tone/flags is predicted to perform this way for a '+p.kpi+' campaign\n'+
-    '(2) What the auto-selected fields contribute (if any were auto-selected)\n'+
-    '(3) The single biggest lever the user could change to improve '+p.kpi+' further\n\n'+
+    '\u2022 Based on '+p.base+' similar creatives \u2014 closest archetype: C'+(p.bestCluster||'?')+
+      (persona?` ("${persona.name||''}" \u2014 ${persona.tagline||''})`:'')+'\n'+
+    '\u2022 Closest archetype profile: typical format='+(cpProf.top_format||'?')+', theme='+(cpProf.top_theme||'?')+', tone='+(cpProf.top_tone||'?')+', avg perf '+((cpProf.avg_perf||0)*100).toFixed(0)+'/100, avg CTR '+((cpProf.avg_ctr||0)*100).toFixed(2)+'%, avg ROAS '+(cpProf.avg_roas||0).toFixed(2)+'x\n\n'+
+    'TOP-5 FEATURE IMPORTANCES FOR THE '+p.kpi+' MODEL (the model says these matter most):\n'+(fiTop||'  n/a')+'\n\n'+
+    'COUNTERFACTUAL ANALYSIS — single-field swaps that improve the user\'s '+p.kpi+' goal\n'+
+    '(values are real averages from the matching pool of similar creatives):\n'+cfStr+'\n\n'+
+    'TASK: Write a 5\u20136 sentence explanation covering:\n'+
+    '(1) Why this specific combination is predicted to perform this way for a '+p.kpi+' campaign \u2014 reference the closest archetype.\n'+
+    '(2) Which of the top-importance features are working FOR vs AGAINST this spec.\n'+
+    '(3) The TOP COUNTERFACTUAL above \u2014 explicitly recommend that swap and quantify the predicted lift.\n'+
+    '(4) Any risk or caveat (e.g. low sample size, conflicting signals).\n\n'+
     'RULES:\n'+
-    '- No ML jargon (no "cluster", "model", "feature importance", "algorithm", "PCA")\n'+
-    '- Reference the actual numbers and creative attributes above\n'+
+    '- No ML jargon (no "cluster", "model", "feature importance", "algorithm", "PCA", "OLS")\n'+
+    '- Reference the actual numbers and counterfactual deltas above\n'+
     '- Be specific to this configuration \u2014 avoid advice that applies to any ad';
   try{
     res.innerHTML='<div class="explain-box" style="font-style:italic;color:var(--muted)">\u270D Writing\u2026</div>';
@@ -2199,7 +2514,28 @@ function predictNewCreative(){
   adj('has_discount_badge',hasBadge?1:0);
   adj('duration_sec',Math.min(1,dur/120));
   adj('text_density',td);
+  const heuristicScore=Math.max(0.05,Math.min(0.98,score));
+
+  // ── OLS model inference (uses scaler + PCA + linear regression weights from
+  //    ml_results.json — i.e. the actual trained model). Blended 50/50 with
+  //    the cluster-based heuristic to combine archetype anchoring with model fit.
+  const _specObj={fmt,vert,theme,tone,kpi,osTarget,language,hookType,colorVal,
+                  dur,td,hasGP,hasUGC,hasPrice,hasBadge};
+  const olsScore=_runOLSPredictor(_specToFeatureDict(_specObj));
+  score=olsScore!=null?(0.5*heuristicScore+0.5*olsScore):heuristicScore;
   score=Math.max(0.05,Math.min(0.98,score));
+
+  // ── KPI-aware counterfactuals: each lever shows what happens to the user's
+  //    chosen KPI (CPA $, CTR %, ROAS x, IPM) if a single field is swapped.
+  //    Computed on the same matching-pool fallback that produced the headline
+  //    number, so the deltas are always consistent with what's displayed above.
+  const _baseKpi=_kpiAvg(base, kpi);
+  const counterfactuals=_computeKpiCounterfactuals(_specObj, _baseKpi.avg, kpi);
+
+  // ── Uncertainty bands bootstrapped on the SAME matching pool, so the 80% CI
+  //    actually brackets the displayed average (the previous cluster-level CI
+  //    could live far from the pool's mean and looked inconsistent).
+  const ucBands=_bootstrapBands(base);
 
   const pct100=(score*100).toFixed(0);
   let band,bandColor;
@@ -2258,7 +2594,24 @@ function predictNewCreative(){
     'pred-price':hasPrice?'1':'0','pred-badge':hasBadge?'1':'0',
     'pred-duration':dur.toFixed(0),'pred-textdensity':td.toFixed(2)
   };
-  window._lastPrediction={fmt,vert,theme,tone,kpi,osTarget,language,hookType,colorVal,dur,td,hasGP,hasUGC,hasPrice,hasBadge,score,band,autoFields,avgCTR,avgROAS,avgIPM,avgCPA,bestCluster,base:base.length,_resolvedSpec};
+  window._lastPrediction={fmt,vert,theme,tone,kpi,osTarget,language,hookType,colorVal,dur,td,hasGP,hasUGC,hasPrice,hasBadge,score,heuristicScore,olsScore,band,autoFields,avgCTR,avgROAS,avgIPM,avgCPA,bestCluster,base:base.length,counterfactuals,_resolvedSpec};
+
+  // ── Counterfactual HTML — top single-field changes that improve the user's KPI
+  const _baseKpiStr=_formatKpiAbs(_baseKpi.avg, kpi);
+  const cfHTML=counterfactuals.length?`
+    <div style="background:linear-gradient(135deg,rgba(63,185,80,0.10),rgba(99,102,241,0.10));border:1px solid rgba(63,185,80,0.35);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--accent2);margin-bottom:4px">\uD83C\uDFAF Top counterfactual levers (predicted ${_kpiUnitLabel(kpi)})</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Each row shows what your <strong>${kpi}</strong> becomes if you flip <em>one</em> field. Re-computed against the matching pool of similar real creatives. Baseline: <strong style="color:var(--text)">${_baseKpiStr}</strong> (n=${_baseKpi.n}).</div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        ${counterfactuals.map(cf=>`<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;background:var(--surface2);border-radius:6px;padding:5px 10px">
+          <span><span style="color:var(--muted)">${cf.label}:</span> <span style="color:var(--text)">${cf.from}</span> \u2192 <strong style="color:var(--accent2)">${cf.to}</strong></span>
+          <span style="font-weight:700;color:var(--accent2)" title="n=${cf.n} similar creatives">${_formatKpiAbs(cf.newAvg, kpi)} <span style="opacity:.75;font-weight:600">(${_formatKpiDelta(cf.improvement, kpi)})</span></span>
+        </div>`).join('')}
+      </div>
+    </div>`:'';
+
+  // ── OLS vs heuristic — small diagnostic line so the user sees both signals
+  const modelLine=olsScore!=null?`<div style="font-size:10px;color:var(--muted);margin-bottom:10px">model score: <strong style="color:var(--purple)">${(olsScore*100).toFixed(0)}/100</strong> \u00B7 cluster-heuristic: <strong style="color:var(--accent)">${(heuristicScore*100).toFixed(0)}/100</strong> \u00B7 blended above</div>`:'';
 
   const similar=[...base].sort((a,b)=>{
     const aGP=a.has_gameplay===hasGP?1:0,bGP=b.has_gameplay===hasGP?1:0;
@@ -2266,19 +2619,34 @@ function predictNewCreative(){
     return (bGP+bU)-(aGP+aU)||(b.perf_score||0)-(a.perf_score||0);
   }).slice(0,3);
 
+  // Per-tile uncertainty band labels using the matched cluster CIs
+  const _bandLabel=(label)=>{
+    if(label==='CTR')   return _fmtBand(ucBands.ctr,  v=>(v*100).toFixed(2)+'%');
+    if(label==='ROAS')  return _fmtBand(ucBands.roas, v=>v.toFixed(2)+'x');
+    if(label==='IPM')   return _fmtBand(ucBands.ipm,  v=>v.toFixed(1));
+    if(label==='CPA')   return _fmtBand(ucBands.cpa,  v=>'$'+v.toFixed(2));
+    if(label==='Perf Score') return _fmtBand(ucBands.perf, v=>(v*100).toFixed(0));
+    return '';
+  };
+  const primaryBand = _bandLabel(KPI_PRIMARY_LBL[kpi]);
+
   document.getElementById('pred-result').innerHTML=`
     <div class="pred-result">
       ${overrideHTML}${autoHTML}
       <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Expected ${primaryDesc} for your ${kpi} goal</div>
       <div style="font-size:56px;font-weight:800;color:${primaryColor};line-height:1;margin-bottom:2px">${primaryVal}</div>
-      <div style="font-size:13px;font-weight:600;color:${primaryColor};margin-bottom:8px">${KPI_PRIMARY_LBL[kpi]}${cpaSuffix}</div>
-      <div class="pred-band" style="color:${bandColor};margin-bottom:14px">${band}</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:600;color:${primaryColor};margin-bottom:4px">${KPI_PRIMARY_LBL[kpi]}${cpaSuffix}</div>
+      ${primaryBand?`<div style="margin-bottom:8px">${primaryBand}</div>`:''}
+      <div class="pred-band" style="color:${bandColor};margin-bottom:8px">${band}</div>
+      ${modelLine}
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;margin-bottom:14px">
         ${secMetrics.map(m=>`<div style="background:var(--surface2);border-radius:8px;padding:9px 8px;text-align:center">
           <div style="font-size:15px;font-weight:700;color:${m.color}">${m.val}</div>
           <div style="font-size:10px;color:var(--muted);margin-top:2px">${m.label}</div>
+          ${_bandLabel(m.label)?`<div style="margin-top:2px">${_bandLabel(m.label)}</div>`:''}
         </div>`).join('')}
       </div>
+      ${cfHTML}
       <div class="pred-badges" style="margin-bottom:12px">
         <span class="badge ${score>=0.65?'top_performer':score>=0.5?'stable':'underperformer'}">${score>=0.65?'top performer':score>=0.5?'stable':'underperformer'}</span>
         ${bestCluster?'<span class="kpi-badge">Cluster C'+bestCluster+'</span>':''}
@@ -2389,7 +2757,217 @@ Binary flags (5): has_gameplay (1 if gameplay footage shown — top CVR predicto
 • "How do I use X tab?" → step-by-step practical walkthrough
 • Creative strategy questions → draw on dataset norms (CTR benchmarks, format comparisons, cluster insights, feature importance findings) to give specific, grounded advice
 • Questions about specific creatives or clusters → remind user they can click into the dashboard; you don't have live access to individual creative rows but can explain how to interpret what they're seeing
-• Always use plain English. Translate any ML term before using it. Be concise but complete. Never guess — if something is outside the dataset context, say so clearly.`;
+• Always use plain English. Translate any ML term before using it. Be concise but complete. Never guess — if something is outside the dataset context, say so clearly.
+
+━━━ TOOLS YOU CAN CALL ━━━
+You have function-calling tools that let you query the live in-browser dataset directly:
+- get_top_creatives, get_creative_details, get_cluster_info, get_winning_dna,
+  find_fatigued_creatives, predict_new_creative, compare_kpi_by_attribute.
+When the user asks anything specific that needs data ("which is best for…", "show me top X", "what would happen if…", "is creative #N…"), CALL the tool instead of guessing. Call multiple tools if needed. After getting tool results, summarise in plain marketing language.`;
+
+
+// ── CHATBOT TOOLS (function-calling) ──────────────────────────────────────────
+// Tool declarations follow Gemini's function-calling schema. The model sees
+// these descriptions and decides when to call them. We execute the underlying
+// JS function locally, then send the result back as a functionResponse part.
+const _chatTools=[{
+  functionDeclarations:[
+    {name:'get_top_creatives',
+     description:'Return the top-N creatives ranked by a KPI, optionally filtered by vertical or format.',
+     parameters:{type:'OBJECT',properties:{
+       kpi:{type:'STRING',description:'CTR, ROAS, IPM, or CPA. CPA is sorted ascending (lower is better).'},
+       vertical:{type:'STRING',description:'optional: gaming, ecommerce, fintech, travel, health, entertainment'},
+       format:{type:'STRING',description:'optional: rewarded_video, interstitial, playable, banner, native'},
+       n:{type:'INTEGER',description:'how many to return (default 5)'}
+     }, required:['kpi']}},
+    {name:'get_creative_details',
+     description:'Return full attributes + performance + cluster info for a single creative by ID.',
+     parameters:{type:'OBJECT',properties:{creative_id:{type:'INTEGER'}},required:['creative_id']}},
+    {name:'get_cluster_info',
+     description:'Return profile, persona and SHAP signals for one of the 8 clusters (1-8).',
+     parameters:{type:'OBJECT',properties:{cluster_id:{type:'INTEGER'}},required:['cluster_id']}},
+    {name:'get_winning_dna',
+     description:'Return the most common attribute values among top performers for a given KPI (and optional vertical).',
+     parameters:{type:'OBJECT',properties:{
+       kpi:{type:'STRING'},
+       vertical:{type:'STRING',description:'optional'}
+     }, required:['kpi']}},
+    {name:'find_fatigued_creatives',
+     description:'List creatives whose status is fatigued, optionally filtered by advertiser.',
+     parameters:{type:'OBJECT',properties:{
+       advertiser:{type:'STRING',description:'optional substring match'},
+       n:{type:'INTEGER',description:'how many to return (default 10)'}
+     }}},
+    {name:'predict_new_creative',
+     description:'Estimate KPI metrics for a hypothetical creative given its attributes. Uses the trained PCA + linear model (OLS path) on top of cluster matching. Returns predicted score, expected CTR/ROAS/IPM/CPA, closest cluster, and the 5 top counterfactual levers.',
+     parameters:{type:'OBJECT',properties:{
+       format:{type:'STRING'}, vertical:{type:'STRING'}, theme:{type:'STRING'}, tone:{type:'STRING'},
+       kpi:{type:'STRING'}, os:{type:'STRING'}, language:{type:'STRING'}, hook_type:{type:'STRING'},
+       dominant_color:{type:'STRING'},
+       duration_sec:{type:'NUMBER'}, text_density:{type:'NUMBER'},
+       has_gameplay:{type:'BOOLEAN'}, has_ugc_style:{type:'BOOLEAN'},
+       has_price:{type:'BOOLEAN'}, has_discount_badge:{type:'BOOLEAN'}
+     }, required:['vertical','kpi']}},
+    {name:'compare_kpi_by_attribute',
+     description:'Average a KPI across the values of a categorical attribute. Use to answer e.g. "what is best CTR by format?".',
+     parameters:{type:'OBJECT',properties:{
+       kpi:{type:'STRING',description:'CTR, ROAS, IPM, CPA, or perf_score'},
+       attribute:{type:'STRING',description:'ad_format, vertical, theme, tone, os, language, hook_type, dominant_color, kpi_goal'},
+       vertical:{type:'STRING',description:'optional vertical filter'}
+     }, required:['kpi','attribute']}},
+  ]
+}];
+
+const _kpiField={CTR:'overall_ctr',ROAS:'overall_roas',IPM:'overall_ipm',CPA:'cpa',perf_score:'perf_score'};
+const _kpiLow={CPA:true};
+function _toolGetTopCreatives({kpi,vertical,format,n=5}){
+  const f=_kpiField[kpi]||'perf_score'; const low=!!_kpiLow[kpi];
+  let pool=C.filter(c=>c[f]!=null&&c[f]>0);
+  if(vertical)pool=pool.filter(c=>c.vertical===vertical);
+  if(format)pool=pool.filter(c=>c.ad_format===format);
+  pool.sort((a,b)=>low?(a[f]-b[f]):(b[f]-a[f]));
+  return pool.slice(0,Math.min(20,n)).map(c=>({
+    id:c.creative_id, headline:c.headline, advertiser:c.advertiser_name,
+    format:c.ad_format, vertical:c.vertical, theme:c.theme, tone:c.tone,
+    [kpi.toLowerCase()]:c[f], perf_score:c.perf_score,
+    cluster:(ML.creative_ml[c.creative_id]||{}).cluster, status:c.performance_status,
+  }));
+}
+function _toolGetCreativeDetails({creative_id}){
+  const c=CMAP[+creative_id]; if(!c)return {error:`No creative #${creative_id}`};
+  const cml=ML.creative_ml[c.creative_id]||{};
+  const shap=ML.creative_shap?.[c.creative_id]||null;
+  return {
+    id:c.creative_id, headline:c.headline, advertiser:c.advertiser_name, app:c.app_name,
+    format:c.ad_format, vertical:c.vertical, theme:c.theme, tone:c.tone,
+    hook:c.hook_type, color:c.dominant_color, language:c.language,
+    duration_sec:c.duration_sec, text_density:c.text_density,
+    has_gameplay:c.has_gameplay, has_ugc_style:c.has_ugc_style,
+    has_price:c.has_price, has_discount_badge:c.has_discount_badge,
+    overall_ctr:c.overall_ctr, overall_roas:c.overall_roas,
+    overall_cvr:c.overall_cvr, overall_ipm:c.overall_ipm, cpa:c.cpa,
+    perf_score:c.perf_score, status:c.performance_status,
+    fatigue_day:c.fatigue_day, ctr_decay_pct:c.ctr_decay_pct,
+    cluster:cml.cluster,
+    top_shap:(shap?.top||[]).slice(0,5),
+  };
+}
+function _toolGetClusterInfo({cluster_id}){
+  const k=String(cluster_id);
+  const p=ML.cluster_profiles?.[k]; if(!p)return {error:`No cluster ${k}`};
+  return {
+    cluster:k,
+    persona:(ML.cluster_personas||{})[k]||null,
+    profile:p,
+    distinguishing_signals:((ML.cluster_shap_profiles||{})[k]||{}).top?.slice(0,6)||[],
+    n:p.size,
+  };
+}
+function _toolGetWinningDNA({kpi,vertical}){
+  const f=_kpiField[kpi]||'perf_score'; const low=!!_kpiLow[kpi];
+  let pool=C.filter(c=>c.performance_status==='top_performer');
+  if(vertical)pool=pool.filter(c=>c.vertical===vertical);
+  if(!pool.length)return {error:'No top performers match'};
+  const mode=(field)=>{
+    const tally={};
+    pool.forEach(c=>{const v=c[field]; if(v!=null&&v!=='')tally[v]=(tally[v]||0)+1;});
+    return Object.entries(tally).sort((a,b)=>b[1]-a[1])[0]?.[0]||null;
+  };
+  const avg=(field)=>pool.reduce((s,c)=>s+(c[field]||0),0)/pool.length;
+  return {
+    n_top_performers:pool.length, kpi, vertical:vertical||'all',
+    most_common:{format:mode('ad_format'),theme:mode('theme'),tone:mode('tone'),
+                 hook:mode('hook_type'),color:mode('dominant_color'),language:mode('language')},
+    avg_metrics:{ctr:avg('overall_ctr'),roas:avg('overall_roas'),
+                 ipm:avg('overall_ipm'),perf_score:avg('perf_score')},
+    pct_with_gameplay:pool.filter(c=>c.has_gameplay).length/pool.length,
+    pct_with_ugc:pool.filter(c=>c.has_ugc_style).length/pool.length,
+    avg_novelty:avg('novelty_score'), avg_motion:avg('motion_score'),
+  };
+}
+function _toolFindFatigued({advertiser,n=10}){
+  let pool=C.filter(c=>c.performance_status==='fatigued');
+  if(advertiser){const q=advertiser.toLowerCase();
+    pool=pool.filter(c=>(c.advertiser_name||'').toLowerCase().includes(q));}
+  pool.sort((a,b)=>(a.ctr_decay_pct||0)-(b.ctr_decay_pct||0));
+  return pool.slice(0,Math.min(20,n)).map(c=>({
+    id:c.creative_id, headline:c.headline, advertiser:c.advertiser_name,
+    format:c.ad_format, decay_pct:c.ctr_decay_pct, fatigue_day:c.fatigue_day,
+    kpi:c.kpi_goal, perf_score:c.perf_score,
+  }));
+}
+function _toolPredict(args){
+  const spec={
+    fmt:args.format||'', vert:args.vertical||'', theme:args.theme||'',
+    tone:args.tone||'', kpi:args.kpi||'CTR',
+    osTarget:args.os||'', language:args.language||'',
+    hookType:args.hook_type||'', colorVal:args.dominant_color||'',
+    dur:+args.duration_sec||30, td:+args.text_density||0.4,
+    hasGP:!!args.has_gameplay, hasUGC:!!args.has_ugc_style,
+    hasPrice:!!args.has_price, hasBadge:!!args.has_discount_badge,
+  };
+  const ols=_runOLSPredictor(_specToFeatureDict(spec));
+  // Cluster matching reused from predictNewCreative logic
+  const matches=C.filter(c=>c.ad_format===spec.fmt&&c.vertical===spec.vert&&c.theme===spec.theme&&c.kpi_goal===spec.kpi);
+  const pool=matches.length?matches:C.filter(c=>c.vertical===spec.vert&&c.kpi_goal===spec.kpi);
+  const base=pool.length?pool:C;
+  const counts={};
+  base.forEach(c=>{const cl=(ML.creative_ml[c.creative_id]||{}).cluster;if(cl!=null)counts[cl]=(counts[cl]||0)+1;});
+  const bestCluster=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]?.[0];
+  const baseKpi=_kpiAvg(base, spec.kpi);
+  const cf=_computeKpiCounterfactuals(spec, baseKpi.avg, spec.kpi);
+  const avgCTR=base.reduce((s,c)=>s+(c.overall_ctr||0),0)/(base.length||1);
+  const avgROAS=base.reduce((s,c)=>s+(c.overall_roas||0),0)/(base.length||1);
+  const avgIPM=base.reduce((s,c)=>s+(c.overall_ipm||0),0)/(base.length||1);
+  const cpaPool=base.filter(c=>(c.cpa||0)>0);
+  const avgCPA=cpaPool.length?cpaPool.reduce((s,c)=>s+(c.cpa||0),0)/cpaPool.length:null;
+  return {
+    model_score: ols!=null?+(ols*100).toFixed(0):null,
+    expected:{ctr:+(avgCTR*100).toFixed(2)+'%', roas:+avgROAS.toFixed(2),
+              ipm:+avgIPM.toFixed(1), cpa:avgCPA!=null?'$'+avgCPA.toFixed(2):null},
+    closest_cluster:bestCluster,
+    based_on_n:base.length,
+    counterfactuals:cf.map(c=>({
+      lever:c.label, swap:`${c.from} -> ${c.to}`,
+      [`new_${spec.kpi.toLowerCase()}`]: _formatKpiAbs(c.newAvg, spec.kpi),
+      improvement: _formatKpiDelta(c.improvement, spec.kpi),
+      n: c.n,
+    })),
+  };
+}
+function _toolCompareKpi({kpi,attribute,vertical}){
+  const f=_kpiField[kpi]||'perf_score';
+  let pool=C.filter(c=>c[f]!=null&&c[f]>0);
+  if(vertical)pool=pool.filter(c=>c.vertical===vertical);
+  const tally={};
+  pool.forEach(c=>{const v=c[attribute]; if(v==null||v==='')return;
+    if(!tally[v])tally[v]={s:0,n:0};
+    tally[v].s+=c[f]; tally[v].n+=1;});
+  const out=Object.entries(tally).map(([k,o])=>({value:k, n:o.n, avg:+(o.s/o.n).toFixed(4)}))
+                                 .filter(r=>r.n>=3)
+                                 .sort((a,b)=>_kpiLow[kpi]?a.avg-b.avg:b.avg-a.avg);
+  return {kpi, attribute, vertical:vertical||'all', results:out.slice(0,12)};
+}
+const _toolImpls={
+  get_top_creatives:_toolGetTopCreatives, get_creative_details:_toolGetCreativeDetails,
+  get_cluster_info:_toolGetClusterInfo, get_winning_dna:_toolGetWinningDNA,
+  find_fatigued_creatives:_toolFindFatigued, predict_new_creative:_toolPredict,
+  compare_kpi_by_attribute:_toolCompareKpi,
+};
+
+async function _chatGenerate(contents){
+  const model=await _resolveModel();
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${_apiKey}`;
+  const body={
+    system_instruction:{parts:[{text:CHAT_SYSTEM}]},
+    contents, tools:_chatTools,
+    generationConfig:{maxOutputTokens:2200,thinkingConfig:{thinkingBudget:0}},
+  };
+  const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const data=await resp.json();
+  if(data.error)throw new Error(data.error.message);
+  return data.candidates?.[0]?.content||{parts:[{text:'No response.'}]};
+}
 
 
 let chatHistory=[];
@@ -2426,18 +3004,50 @@ async function sendChat(){
     if(sendBtn)sendBtn.disabled=false; return;
   }
   try{
-    thinking.textContent='';
-    thinking.innerHTML='<span></span>';
-    const bubble=thinking.querySelector('span');
-    await callGeminiStream(CHAT_SYSTEM,chatHistory,2000,
-      (partial)=>{bubble.innerHTML=markdownToHtml(partial);msgs.scrollTop=msgs.scrollHeight;});
-    const finalText=bubble.innerHTML;
+    // Build the running content list for the tool-calling loop.
+    // We seed it with the conversation history, then loop until Gemini
+    // emits a text-only response (no functionCall parts).
+    const contents=chatHistory.map(m=>({role:m.role==='assistant'?'model':'user',
+                                        parts:[{text:m.content}]}));
+    let toolCalls=0; let finalText=''; let toolEvents=[];
+    for(let step=0;step<5;step++){
+      thinking.innerHTML=toolCalls
+        ? `🛠 Used ${toolCalls} tool${toolCalls>1?'s':''}, thinking…`
+        : '🤖 Thinking…';
+      const reply=await _chatGenerate(contents);
+      const parts=reply.parts||[];
+      const fnParts=parts.filter(p=>p.functionCall);
+      const txtParts=parts.filter(p=>p.text);
+      if(fnParts.length===0){
+        finalText=txtParts.map(p=>p.text).join('').trim()||'(no response)';
+        break;
+      }
+      // Echo model "thinking aloud" + functionCalls back into history
+      contents.push({role:'model', parts});
+      // Execute every functionCall, then append their responses
+      const fnResponses=[];
+      for(const part of fnParts){
+        const fc=part.functionCall||{};
+        const impl=_toolImpls[fc.name];
+        let result;
+        try{ result=impl?impl(fc.args||{}):{error:`Unknown tool: ${fc.name}`}; }
+        catch(e){ result={error:String(e.message||e)}; }
+        toolCalls++;
+        toolEvents.push({name:fc.name, args:fc.args});
+        fnResponses.push({functionResponse:{name:fc.name, response:{result}}});
+      }
+      contents.push({role:'user', parts:fnResponses});
+    }
+    if(!finalText)finalText='(model exceeded the tool loop limit)';
     msgs.removeChild(thinking);
+    const toolBadge=toolEvents.length
+      ? `<div style="font-size:9px;color:var(--purple);margin-bottom:4px">\uD83D\uDEE0 used: ${toolEvents.map(t=>t.name).join(', ')}</div>`
+      : '';
     const finalEl=document.createElement('div');
     finalEl.className='chat-msg assistant';
-    finalEl.innerHTML='<span>'+finalText+'</span>';
+    finalEl.innerHTML=toolBadge+'<span>'+markdownToHtml(finalText)+'</span>';
     msgs.appendChild(finalEl); msgs.scrollTop=msgs.scrollHeight;
-    chatHistory.push({role:'assistant',content:bubble.textContent});
+    chatHistory.push({role:'assistant',content:finalText});
   }catch(err){
     msgs.removeChild(thinking);
     appendChatMsg('assistant','⚠ Error: '+err.message);
@@ -2462,19 +3072,26 @@ async function aiSmartFill(){
   const os=document.getElementById('pred-os').value;
   const dur=document.getElementById('pred-duration').value;
   const td=document.getElementById('pred-textdensity').value;
-  const gameplay=document.getElementById('pred-gameplay').checked;
-  const ugc=document.getElementById('pred-ugc').checked;
-  const price=document.getElementById('pred-price').checked;
-  const badge=document.getElementById('pred-badge').checked;
+  const _selBool=id=>{const v=document.getElementById(id).value; return v===''?'auto':(v==='1'?'yes':'no');};
+  const gameplay=_selBool('pred-gameplay');
+  const ugc     =_selBool('pred-ugc');
+  const price   =_selBool('pred-price');
+  const badge   =_selBool('pred-badge');
+  const language=document.getElementById('pred-language').value||'auto';
+  const hookType=document.getElementById('pred-hooktype').value||'auto';
+  const colorVal=document.getElementById('pred-color').value||'auto';
 
   const sys=`You are a senior mobile advertising creative strategist. Given a partial creative spec, suggest optimal values for any attributes that need improvement to maximise the stated KPI goal. Use patterns from 1,080 mobile ad creatives across gaming, e-commerce, fintech, travel, health and entertainment verticals. Be specific and brief.`;
   const msg=`KPI Goal: ${kpi}
-Current spec:
-- Format: ${fmt}
-- Vertical: ${vert}
-- Theme: ${theme}
-- Tone: ${tone}
-- OS: ${os}
+Current spec (anything labelled "auto" is currently unset):
+- Format: ${fmt||'auto'}
+- Vertical: ${vert||'(unset)'}
+- Theme: ${theme||'auto'}
+- Tone: ${tone||'auto'}
+- OS: ${os||'auto'}
+- Language: ${language}
+- Hook type: ${hookType}
+- Dominant color: ${colorVal}
 - Duration: ${dur}s
 - Text density: ${td}
 - Gameplay footage: ${gameplay}
@@ -2498,7 +3115,7 @@ Suggest 3-5 specific improvements to maximise ${kpi} performance. For each sugge
 
 // ── Metric Explainability in Creative Modal ────────────────────────────────
 async function explainMetricInContext(cid,metric){
-  const c=DATA.find(x=>x.creative_id===cid); if(!c)return;
+  const c=CMAP[+cid]; if(!c)return;
   if(!_apiKey){alert('API key required.');return;}
   const el=document.getElementById('metric-explain-'+metric);
   if(!el)return;
