@@ -24,35 +24,35 @@ It answers all four through a single self-contained HTML dashboard backed by a s
 | 🔵 Clusters | K-Means cluster profiles (k=8). Cluster composition, dominant traits, average performance. |
 | 🧮 Portfolio Optimizer | Gram-Schmidt orthogonal portfolio builder with a **strategy slider** (pure performance ↔ pure diversity) and KPI targeting. |
 | 🔮 Predict Creative | Estimate the performance of a hypothetical new creative before producing it. |
-| 📖 Help | Full metric glossary, tab guide, and an embedded **Ask Claude** AI chatbot. |
+| 📖 Help | Full metric glossary, tab guide, field to save a **Gemini** API key in-browser, and an embedded **Ask Gemini** chatbot. |
 
 ---
 
 ## Architecture
 
 ```
-CSV data (6 files)
+data/   (six CSVs + data_dictionary.csv + assets/)
       │
       ▼
-ml_pipeline_sklearn.py          ← Python, run once locally
+src/ml_pipeline_sklearn.py       ← Python, run once from repo root
   ├─ pandas: data loading & joins
-  ├─ PIL: image feature extraction (18 visual features per asset)
+  ├─ PIL: image feature extraction from data/assets thumbnails
   ├─ sklearn: PCA · KMeans(k=8) · RandomForestRegressor
   ├─ xgboost: XGBRegressor (KPI-specific models)
   ├─ shap: TreeExplainer (per-creative feature attribution)
   └─ 5-fold cross-validation (R² ± std, MAE)
       │
       ▼
-app_data.js          ← embedded APP_DATA (creatives + timeseries)
-ml_results.json      ← feature importance · clusters · SHAP · model params
+app_data.js (repo root)          ← embedded APP_DATA (creatives + timeseries)
+ml_results.json (repo root)      ← feature importance · clusters · SHAP · model params
       │
       ▼
-build_dashboard.py   ← patches both files into the HTML template
+src/build_dashboard.py           ← patches both into src/dashboard_template.html
       │
       ▼
-creative_copilot.html            ← single self-contained file, open in any browser
+creative_copilot.html (root)     ← single self-contained file, open in any browser
   ├─ Chart.js 4: all charts
-  ├─ Anthropic API: live AI explanations (claude-haiku-4-5)
+  ├─ Google Gemini API: live AI (key from Help tab → localStorage only; never in the file)
   └─ Gram-Schmidt orthogonalisation in JS (Portfolio Optimizer)
 ```
 
@@ -64,6 +64,8 @@ creative_copilot.html            ← single self-contained file, open in any bro
 
 - Python 3.9+
 - pip
+
+Run all commands below from the **repository root** (the folder that contains `data/`, `src/`, and `requirements.txt`).
 
 ### 1. Install dependencies
 
@@ -87,7 +89,7 @@ numpy>=1.24
 ### 2. Run the ML pipeline
 
 ```bash
-python ml_pipeline_sklearn.py
+python src/ml_pipeline_sklearn.py
 ```
 
 This takes roughly **2–5 minutes** (image feature extraction is the bottleneck). It produces:
@@ -98,10 +100,10 @@ This takes roughly **2–5 minutes** (image feature extraction is the bottleneck
 ### 3. Build the dashboard
 
 ```bash
-python build_dashboard.py
+python src/build_dashboard.py
 ```
 
-Patches `app_data.js` and `ml_results.json` into the HTML template and writes `creative_copilot.html` (~3 MB).
+This embeds `app_data.js` and `ml_results.json` into `src/dashboard_template.html` and writes `creative_copilot.html` at the repo root (~3 MB). **No API key is placed in the HTML.** The built file is listed in `.gitignore` because of its size; remove that line if you want to track it in Git.
 
 ### 4. Open the dashboard
 
@@ -203,13 +205,13 @@ Enter the attributes of a hypothetical creative (format, vertical, theme, tone, 
 3. **Prediction band** — maps the score to Likely Top Performer / Stable / Below Average / High-Risk with a recommended action.
 4. **Benchmarks** — shows the top 3 existing creatives in the matched cluster+KPI combination.
 
-After running `ml_pipeline_sklearn.py` locally (which embeds PCA components and scaler parameters), the predictor upgrades to full PCA-based OLS inference.
+After running `python src/ml_pipeline_sklearn.py` locally (which embeds PCA components and scaler parameters), the predictor upgrades to full PCA-based OLS inference.
 
 ---
 
 ### 📖 Help
 
-Static glossary of all metrics, a tab-by-tab usage guide, and an embedded **Ask Claude** AI chatbot. The chatbot can answer questions like *"What does a perf_score of 0.3 mean?"*, *"Why does CTR always drop over time?"*, or *"How do I interpret the orthogonality score?"*
+Static glossary of all metrics, a tab-by-tab usage guide, a **Gemini API key** field (saved in the browser only), and an embedded **Ask Gemini** chatbot. The chatbot can answer questions like *"What does a perf_score of 0.3 mean?"*, *"Why does CTR always drop over time?"*, or *"How do I interpret the orthogonality score?"*
 
 ---
 
@@ -217,9 +219,9 @@ Static glossary of all metrics, a tab-by-tab usage guide, and an embedded **Ask 
 
 Each creative card has an **🤖 Explain** button:
 
-1. On first use, you will be asked for your [Anthropic API key](https://console.anthropic.com) (stored in memory only, never persisted or sent anywhere except the Anthropic API).
+1. Add a [Gemini API key](https://aistudio.google.com/app/apikey) under **Help → Save key** (stored in `localStorage` in this browser only — it is **not** written into `creative_copilot.html` or the repository).
 2. The dashboard structures a JSON payload: performance metrics, status, cluster profile, top KPI feature drivers, and auto-detected positive/negative signals.
-3. `claude-haiku-4-5` translates the payload into a plain-English 3–4 sentence explanation in marketing language.
+3. A Gemini model (e.g. Flash) turns the payload into a plain-English 3–4 sentence explanation in marketing language.
 
 The model is strictly constrained to explain using *only the provided data*, preventing hallucination.
 
@@ -334,41 +336,46 @@ All models evaluated with 5-fold cross-validation (`KFold(n_splits=5, shuffle=Tr
 
 ### SHAP
 
-`shap.TreeExplainer` computes exact Shapley values for every creative. When not installed, a simplified approximation (`feature_importance × standardised_feature_value`) is used. Both feed the same structured JSON payload to Claude when the Explain button is clicked.
+`shap.TreeExplainer` computes exact Shapley values for every creative. When not installed, a simplified approximation (`feature_importance × standardised_feature_value`) is used. Both feed the same structured JSON payload to Gemini when the Explain button is clicked.
 
 ---
 
 ## File Structure
 
 ```
-Smadex_Creative_Intelligence_Dataset_FULL/
+Smadex-Challenge/
 │
-├── creative_copilot.html          ← Main deliverable — open in any browser
-├── ml_pipeline_sklearn.py         ← Regenerates ML outputs (run locally)
-├── build_dashboard.py             ← Patches ML outputs into the HTML
-├── requirements.txt               ← pip dependencies
+├── creative_copilot.html       ← Built dashboard — open in any browser (regenerate with src/build_dashboard.py)
+├── app_data.js                 ← Generated by ML pipeline (gitignored — large)
+├── ml_results.json             ← Generated by ML pipeline (gitignored — large)
+├── requirements.txt
+├── README.md
+├── challenge_instructions.md
+├── .env.example                ← Template for GEMINI_API_KEY (optional, ML pipeline personas only)
 │
-├── README.md                      ← This file
-├── challenge_instructions.md      ← Original challenge brief
-├── data_dictionary.csv            ← Column definitions for all CSVs
+├── data/
+│   ├── data_dictionary.csv
+│   ├── advertisers.csv
+│   ├── campaigns.csv
+│   ├── creatives.csv
+│   ├── creative_summary.csv              ← Main fact table for the dashboard
+│   ├── creative_daily_country_os_stats.csv
+│   ├── campaign_summary.csv
+│   └── assets/                         ← Synthetic PNG thumbnails (creative_<id>.png)
 │
-├── advertisers.csv
-├── campaigns.csv
-├── creatives.csv
-├── creative_summary.csv           ← Main fact table used by the dashboard
-├── creative_daily_country_os_stats.csv
-├── campaign_summary.csv
-│
-└── assets/                        ← Synthetic PNG creative thumbnails
-    ├── 500000.png
-    └── ...
+└── src/
+    ├── ml_pipeline_sklearn.py          ← Regenerates app_data.js + ml_results.json
+    ├── build_dashboard.py              ← Builds creative_copilot.html
+    └── dashboard_template.html        ← HTML/JS shell patched by the builder
 ```
 
 ---
 
 ## Design Decisions
 
-**Self-contained HTML** — zero server setup for demo. All data embedded as JS variables; 3 MB is comfortably within what modern browsers handle instantly.
+**No API key in HTML** — Gemini credentials are supplied in the Help tab and live in the browser only, so the built `creative_copilot.html` does not embed secrets.
+
+**Self-contained HTML** — zero server setup for demo. All data embedded as JS variables; ~3 MB is comfortably within what modern browsers handle instantly.
 
 **PIL over CLIP** — CLIP requires PyTorch (~2 GB), impractical for a hackathon. The 18 PIL features capture the most interpretable visual signals and are fully explainable to a non-technical marketer.
 
@@ -384,8 +391,8 @@ Smadex_Creative_Intelligence_Dataset_FULL/
 
 - The dataset is **fully synthetic**. Patterns may not generalise to real ad inventory.
 - Image features are **heuristic** (PIL-based), not semantic (no object detection or brand recognition).
-- The prediction engine uses a **cluster-match heuristic** until `ml_pipeline_sklearn.py` is run locally to embed full PCA/scaler parameters.
-- The AI explain and chatbot features require a valid **Anthropic API key**.
+- The prediction engine uses a **cluster-match heuristic** until `python src/ml_pipeline_sklearn.py` is run locally to embed full PCA/scaler parameters.
+- The AI explain, chatbot, and similar features need a **Gemini API key** in the browser (Help tab). Optionally, set `GEMINI_API_KEY` in `.env` when running `python src/ml_pipeline_sklearn.py` so optional **cluster personas** can be generated server-side — that file stays out of git via `.gitignore`.
 - SHAP values are computed on training data; use CV R² for honest accuracy estimates.
 
 ---
@@ -394,4 +401,4 @@ Smadex_Creative_Intelligence_Dataset_FULL/
 
 Built for the **Smadex Creative Intelligence Challenge**.
 Dataset provided by Smadex — fully synthetic, no real user data.
-Dashboard: [Chart.js](https://www.chartjs.org/) · AI: [Anthropic Claude](https://www.anthropic.com/).
+Dashboard: [Chart.js](https://www.chartjs.org/) · AI: [Google Gemini](https://ai.google.dev/).

@@ -124,7 +124,7 @@ tr:hover td{background:#ffffff05}
 .explain-box{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--purple);
   border-radius:7px;padding:12px 14px;font-size:12px;line-height:1.7;color:var(--text);margin-top:10px}
 .explain-loading{color:var(--muted);font-size:11px;font-style:italic}
-/* ── API key is set at build time by build_dashboard.py ──────── */
+/* ── Gemini API key: Help tab → browser localStorage (not embedded in HTML) ── */
 /* ── Strategy slider ─────────────────────────────────────────── */
 .strategy-track{display:flex;align-items:center;gap:10px;margin:10px 0}
 .strategy-track input[type=range]{flex:1;accent-color:var(--purple)}
@@ -746,11 +746,16 @@ tr:hover td{background:#ffffff05}
         <div class="metric-row"><div class="metric-name">ml_pipeline_sklearn.py</div>
           <div class="metric-def">Joins CSVs → builds 24-feature matrix → PCA → K-Means → RF + XGBoost → SHAP → writes <code>app_data.js</code> + <code>ml_results.json</code>. Re-run after any data update.</div></div>
         <div class="metric-row"><div class="metric-name">build_dashboard.py</div>
-          <div class="metric-def">Injects <code>app_data.js</code> and <code>ml_results.json</code> into the template and adds your Gemini API key from <code>.env</code>. Outputs <code>creative_copilot.html</code>.</div></div>
-        <div class="metric-row"><div class="metric-name">API key setup</div>
-          <div class="metric-def">Copy <code>.env.example</code> → <code>.env</code>, paste your Gemini key, run <code>build_dashboard.py</code>. The key is never committed to git.</div></div>
+          <div class="metric-def">Embeds <code>app_data.js</code> and <code>ml_results.json</code> into the HTML template. Outputs <code>creative_copilot.html</code>. Does not embed API keys.</div></div>
+        <div class="metric-row"><div class="metric-name">Gemini API key</div>
+          <div class="metric-def">Paste your key below and click Save — stored only in this browser (<code>localStorage</code>). Optional: add <code>GEMINI_API_KEY</code> to <code>.env</code> when running <code>python src/ml_pipeline_sklearn.py</code> to generate cluster personas server-side.</div></div>
+        <div style="margin:10px 0 14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+          <input type="password" id="gemini-key-input" placeholder="Gemini key…" autocomplete="off" style="flex:1;min-width:220px"/>
+          <button type="button" id="gemini-key-save" style="background:var(--accent2);color:#000;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-weight:600;font-size:11px">Save key</button>
+          <button type="button" id="gemini-key-clear" style="background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:8px 12px;border-radius:6px;cursor:pointer;font-size:11px">Clear</button>
+        </div>
         <div class="metric-row"><div class="metric-name">Source files</div>
-          <div class="metric-def"><code>creatives.csv</code> · <code>campaigns.csv</code> · <code>creative_summary.csv</code> · <code>creative_daily_country_os_stats.csv</code> · <code>campaign_summary.csv</code> · <code>advertisers.csv</code></div></div>
+          <div class="metric-def">Under <code>data/</code>: <code>creatives.csv</code> · <code>campaigns.csv</code> · <code>creative_summary.csv</code> · <code>creative_daily_country_os_stats.csv</code> · <code>campaign_summary.csv</code> · <code>advertisers.csv</code></div></div>
       </div>
     </div>
 
@@ -764,8 +769,12 @@ tr:hover td{background:#ffffff05}
 <script>
 'use strict';
 
-// ── API key is set at build time by build_dashboard.py from .env ──
-const _apiKey = '%%GEMINI_KEY%%';
+// ── Gemini: optional build placeholder (always empty in repo); otherwise Help tab → localStorage ──
+const _GEMINI_KEY_BUILD=('%%GEMINI_KEY%%').trim();
+function _geminiKey(){
+  if(_GEMINI_KEY_BUILD) return _GEMINI_KEY_BUILD;
+  try{return(localStorage.getItem('gemini_api_key')||'').trim();}catch(e){return'';}
+}
 
 // Convert basic markdown to safe HTML
 function markdownToHtml(text){
@@ -785,7 +794,7 @@ const _GEMINI_CANDIDATES = [
 let _GEMINI_MODEL = null;
 
 function _geminiURL(model){
-  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${_apiKey}`;
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${_geminiKey()}`;
 }
 
 async function _resolveModel(){
@@ -820,7 +829,7 @@ async function callGemini(systemPrompt,messages,maxTokens){
 // Streaming — calls onChunk(fullAccumulatedText) as tokens arrive
 async function callGeminiStream(systemPrompt,messages,maxTokens,onChunk){
   const model=await _resolveModel();
-  const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${_apiKey}&alt=sse`;
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${_geminiKey()}&alt=sse`;
   const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify(_geminiBody(systemPrompt,messages,maxTokens))});
   if(!resp.ok){const e=await resp.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${resp.status}`);}
@@ -877,6 +886,36 @@ function kpiFmt(kpi,v){
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 function init(){
+  const gki=document.getElementById('gemini-key-input'),
+        gks=document.getElementById('gemini-key-save'),
+        gkc=document.getElementById('gemini-key-clear');
+  if(gki){
+    try{
+      if((localStorage.getItem('gemini_api_key')||'').trim()) gki.placeholder='•••• key saved — paste to replace';
+    }catch(e){}
+  }
+  if(gks){
+    gks.addEventListener('click',()=>{
+      const v=(gki?.value||'').trim();
+      try{
+        if(v) localStorage.setItem('gemini_api_key',v);
+        else localStorage.removeItem('gemini_api_key');
+        _GEMINI_MODEL=null;
+        alert(v?'Saved in this browser only.':'API key cleared.');
+        if(gki){ gki.value=''; gki.placeholder=v?'•••• key saved — paste to replace':'Gemini key…'; }
+      }catch(err){ alert('Could not access browser storage.'); }
+    });
+  }
+  if(gkc){
+    gkc.addEventListener('click',()=>{
+      try{
+        localStorage.removeItem('gemini_api_key');
+        _GEMINI_MODEL=null;
+        if(gki){ gki.value=''; gki.placeholder='Gemini key…'; }
+        alert('Cleared.');
+      }catch(err){}
+    });
+  }
   const tot=C.length,top=C.filter(c=>c.performance_status==='top_performer').length,
         fat=C.filter(c=>c.performance_status==='fatigued').length,
         avgCTR=(C.reduce((s,c)=>s+(c.overall_ctr||0),0)/tot*100).toFixed(2);
@@ -1368,8 +1407,8 @@ async function renderFI(){
 
   // Show loading state
   explainEl.innerHTML='<p style="color:var(--muted);font-size:11px">🤖 Generating interpretation…</p>';
-  if(!_apiKey){
-    explainEl.innerHTML='<p style="color:var(--muted);font-size:11px">Set GEMINI_API_KEY to enable AI-generated interpretations.</p>';
+  if(!_geminiKey()){
+    explainEl.innerHTML='<p style="color:var(--muted);font-size:11px">Save your Gemini API key under Help to enable AI-generated interpretations.</p>';
     return;
   }
 
@@ -1617,8 +1656,8 @@ function renderClusterPerf(){
 async function explainCluster(k){
   if(!k){ return; }
   const out=document.getElementById('cl-explain-out');
-  if(!_apiKey){
-    out.innerHTML='<div class="explain-box" style="border-color:var(--warn)">⚠ API key not set — rebuild with GEMINI_API_KEY in .env.</div>'; return;
+  if(!_geminiKey()){
+    out.innerHTML='<div class="explain-box" style="border-color:var(--warn)">⚠ Save your Gemini API key under Help → Save key.</div>'; return;
   }
   if(_clusterExplainCache[k]){
     out.innerHTML=`<div class="explain-box">${markdownToHtml(_clusterExplainCache[k])}</div>`; return;
@@ -1836,7 +1875,7 @@ function computeOrtho(){
 }
 
 async function whyThis(cid,btn){
-  if(!_apiKey){alert('Set a Gemini API key first.');return;}
+  if(!_geminiKey()){alert('Add your Gemini API key under Help → Save key.');return;}
   const container=document.getElementById('why-ort-'+cid);
   btn.disabled=true;btn.textContent='Thinking…';
   container.style.display='block';
@@ -1895,8 +1934,8 @@ function renderCovChart(coverage){
 async function explainCreative(cid){
   const mBtn=document.getElementById('modal-explain-btn');
   const mExpl=document.getElementById('modal-explain');
-  if(!_apiKey){
-    mExpl.innerHTML='<div class="explain-box" style="border-color:var(--warn)">⚠ API key not set — rebuild with GEMINI_API_KEY in .env.</div>'; return;
+  if(!_geminiKey()){
+    mExpl.innerHTML='<div class="explain-box" style="border-color:var(--warn)">⚠ Save your Gemini API key under Help → Save key.</div>'; return;
   }
   mBtn.disabled=true; mBtn.textContent='🤖 Generating…';
   mExpl.innerHTML='<div class="explain-loading">🤖 Gemini is analysing this creative…</div>';
@@ -2957,7 +2996,7 @@ const _toolImpls={
 
 async function _chatGenerate(contents){
   const model=await _resolveModel();
-  const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${_apiKey}`;
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${_geminiKey()}`;
   const body={
     system_instruction:{parts:[{text:CHAT_SYSTEM}]},
     contents, tools:_chatTools,
@@ -2998,9 +3037,9 @@ async function sendChat(){
   const thinking=document.createElement('div');
   thinking.className='chat-msg assistant thinking'; thinking.textContent='🤖 Thinking…';
   const msgs=document.getElementById('chat-messages'); msgs.appendChild(thinking); msgs.scrollTop=msgs.scrollHeight;
-  if(!_apiKey){
+  if(!_geminiKey()){
     msgs.removeChild(thinking);
-    appendChatMsg('assistant','⚠ AI features require a Gemini API key. Set GEMINI_API_KEY in .env and rebuild.');
+    appendChatMsg('assistant','⚠ AI features need a Gemini API key. Open Help and paste your key, then Save.');
     if(sendBtn)sendBtn.disabled=false; return;
   }
   try{
@@ -3060,7 +3099,7 @@ async function sendChat(){
 async function aiSmartFill(){
   const btn=document.getElementById('smart-fill-btn');
   const out=document.getElementById('smart-fill-result');
-  if(!_apiKey){out.innerHTML='<span style="color:var(--warn)">⚠ API key required for Smart Fill.</span>';return;}
+  if(!_geminiKey()){out.innerHTML='<span style="color:var(--warn)">⚠ Save your Gemini API key under Help first.</span>';return;}
   btn.disabled=true; btn.textContent='✨ Thinking…';
   out.textContent='';
   // Collect what the user has already set
@@ -3116,7 +3155,7 @@ Suggest 3-5 specific improvements to maximise ${kpi} performance. For each sugge
 // ── Metric Explainability in Creative Modal ────────────────────────────────
 async function explainMetricInContext(cid,metric){
   const c=CMAP[+cid]; if(!c)return;
-  if(!_apiKey){alert('API key required.');return;}
+  if(!_geminiKey()){alert('Save your Gemini API key under Help first.');return;}
   const el=document.getElementById('metric-explain-'+metric);
   if(!el)return;
   if(el.dataset.loaded){el.style.display=el.style.display==='none'?'block':'none';return;}

@@ -1,11 +1,8 @@
 # ── Secret keys ───────────────────────────────────────────────────────
-# NEVER commit the .env file — it contains your Anthropic API key.
+# NEVER commit `.env` — it may contain GEMINI_API_KEY for optional ML pipeline features (cluster personas).
 .env
 
-# ── Built outputs ─────────────────────────────────────────────────────
-# creative_copilot.html is the BUILT file — it contains the injected API key.
-# Commit it only after verifying it holds no secrets (i.e. built without a key).
-# For sharing the live demo privately, distribute the file directly, not via Git.
+# Built dashboard is large and regenerated locally.
 creative_copilot.html
 
 # Generated data files (large, reproducible from the CSVs)

@@ -2,13 +2,13 @@
 Smadex Creative Copilot — ML Pipeline (scikit-learn + xgboost edition)
 =======================================================================
 Run once to regenerate ml_results.json and app_data.js, then run
-build_dashboard.py to rebuild creative_copilot.html.
+python src/build_dashboard.py to rebuild creative_copilot.html.
 
 Install dependencies:
     pip install pandas scikit-learn xgboost shap
 
-Usage (from the dataset folder):
-    python ml_pipeline_sklearn.py
+Usage (from the repository root):
+    python src/ml_pipeline_sklearn.py
 """
 
 import json
@@ -56,9 +56,9 @@ except ImportError:
 # ─────────────────────────────────────────────────────────────────────
 # PATHS  (relative to this script)
 # ─────────────────────────────────────────────────────────────────────
-BASE      = Path(__file__).parent
-DATA_DIR  = BASE
-OUT_DIR   = BASE          # app_data.js + ml_results.json land here
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR  = REPO_ROOT / "data"
+OUT_DIR   = REPO_ROOT    # app_data.js + ml_results.json at repo root
 
 np.random.seed(42)
 
@@ -209,7 +209,7 @@ def _extract_image_features(image_path):
 
 
 print("\n── 2. Extracting image features from creative thumbnails ─────")
-ASSETS_DIR = BASE / "assets"
+ASSETS_DIR = DATA_DIR / "assets"
 img_rows = []
 extracted = 0
 if HAS_PIL and ASSETS_DIR.exists():
@@ -651,7 +651,7 @@ else:
 print("\n── 8d-bis. Cluster personas (Gemini) ─────────────────────────")
 
 def _load_gemini_key():
-    env_path = BASE / ".env"
+    env_path = REPO_ROOT / ".env"
     if not env_path.exists():
         return ""
     for line in env_path.read_text(encoding="utf-8").splitlines():
