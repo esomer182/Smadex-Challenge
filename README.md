@@ -1,6 +1,6 @@
 # Smadex Creative Copilot
 
-**A Creative Intelligence prototype for mobile advertisers — built for the Smadex Creative Intelligence Challenge.**
+**A Creative Intelligence prototype for mobile advertisers — built for the Smadex Creative Intelligence Challenge and HackUPC 2026. Won 3rd place at HackUPC, which had over 700 participants.**
 
 The Creative Copilot helps advertising teams answer four hard operational questions:
 
