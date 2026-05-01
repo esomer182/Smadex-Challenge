@@ -1,0 +1,4 @@
+# Keep GitHub Linguist focused on source code, not generated artifacts.
+creative_copilot.html linguist-generated=true
+app_data.js linguist-generated=true
+ml_results.json linguist-generated=true
